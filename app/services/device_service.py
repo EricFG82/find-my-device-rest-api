@@ -26,31 +26,62 @@ class DeviceService:
         self._cache_timestamp: Optional[datetime] = None
         self._cache_ttl = 60  # Cache TTL in seconds
         self._lock = asyncio.Lock()
+        self._device_list_protobuf = None  # Store full protobuf for location fetching
+        self._location_cache: Dict[str, Dict[str, Any]] = {}  # Cache locations by device_id
+        self._location_cache_timestamp: Dict[str, datetime] = {}  # Track cache time per device
+        self._background_task: Optional[asyncio.Task] = None  # Background location update task
+        self._location_update_interval = 300  # Update locations every 5 minutes
+        self._fcm_receiver = None  # Shared FCM receiver instance
         
     async def initialize(self):
         """Initialize the device service"""
         try:
             # Import GoogleFindMyTools modules
             from NovaApi.ListDevices import nbe_list_devices
-            from Auth import auth
-            
+            from Auth.username_provider import get_username
+
             # Store references to the modules
             self.nbe_list_devices = nbe_list_devices
-            self.auth = auth
-            
-            # Verify authentication
+            self.get_username = get_username
+
+            # Verify authentication by checking if secrets.json exists
             logger.info("Verifying authentication...")
-            # The auth module should have already been set up with secrets.json
-            
+            try:
+                username = get_username()
+                logger.info(f"Authentication verified for user: {username}")
+            except Exception as auth_error:
+                logger.error(f"Authentication failed: {auth_error}")
+                raise Exception("Authentication not configured. Please run authentication first.")
+
             self.initialized = True
             logger.info("Device service initialized successfully")
-            
+
+            # Start background location update task
+            self._background_task = asyncio.create_task(self._background_location_updater())
+            logger.info("Background location updater started")
+
         except Exception as e:
             logger.error(f"Failed to initialize device service: {e}", exc_info=True)
             raise
     
     async def cleanup(self):
         """Cleanup resources"""
+        # Stop background task
+        if self._background_task:
+            self._background_task.cancel()
+            try:
+                await self._background_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("Background location updater stopped")
+
+        # Stop FCM receiver if running
+        if self._fcm_receiver:
+            try:
+                self._fcm_receiver.stop_listening()
+            except Exception as e:
+                logger.warning(f"Error stopping FCM receiver: {e}")
+
         self.initialized = False
         self._devices_cache = None
         logger.info("Device service cleaned up")
@@ -64,15 +95,90 @@ class DeviceService:
         try:
             # Run the blocking call in a thread pool
             loop = asyncio.get_event_loop()
-            
+
             # Import the necessary functions
-            from NovaApi.ListDevices.nbe_list_devices import get_devices_data
-            
+            from NovaApi.ListDevices.nbe_list_devices import request_device_list
+            from ProtoDecoders.decoder import parse_device_list_protobuf, get_canonic_ids
+
             # Execute in thread pool to avoid blocking
-            devices_data = await loop.run_in_executor(None, get_devices_data)
-            
+            result_hex = await loop.run_in_executor(None, request_device_list)
+
+            # Parse the protobuf response
+            device_list = parse_device_list_protobuf(result_hex)
+
+            # Get canonical IDs (device name and ID pairs)
+            canonic_ids = get_canonic_ids(device_list)
+
+            # Store the full device_list for location fetching
+            self._device_list_protobuf = device_list
+
+            # Create a mapping of canonic_id to device metadata
+            device_metadata_map = {}
+            for device in device_list.deviceMetadata:
+                device_name = device.userDefinedDeviceName
+                # Get canonic IDs for this device
+                if device.identifierInformation.type == 1:  # IDENTIFIER_ANDROID
+                    canonic_ids_list = device.identifierInformation.phoneInformation.canonicIds.canonicId
+                else:
+                    canonic_ids_list = device.identifierInformation.canonicIds.canonicId
+
+                for canonic_id_obj in canonic_ids_list:
+                    canonic_id = canonic_id_obj.id
+                    device_metadata_map[canonic_id] = device
+
+            # Convert to our format with additional metadata
+            devices_data = []
+            for device_name, canonic_id in canonic_ids:
+                device_dict = {
+                    'id': canonic_id,
+                    'deviceId': canonic_id,
+                    'name': device_name,
+                    'deviceName': device_name,
+                    'type': 'SPOT_DEVICE',
+                    'deviceType': 'SPOT_DEVICE',
+                    'status': 'ACTIVE'
+                }
+
+                # Add metadata if available
+                if canonic_id in device_metadata_map:
+                    device_meta = device_metadata_map[canonic_id]
+
+                    # Add image URL if available
+                    if device_meta.HasField('imageInformation') and device_meta.imageInformation.imageUrl:
+                        device_dict['imageUrl'] = device_meta.imageInformation.imageUrl
+
+                    # Add identifier type
+                    if device_meta.HasField('identifierInformation'):
+                        id_info = device_meta.identifierInformation
+                        device_dict['identifierType'] = str(id_info.type)
+
+                    # Add device information if available
+                    if device_meta.HasField('information'):
+                        info = device_meta.information
+
+                        # Add device registration info
+                        if info.HasField('deviceRegistration'):
+                            reg = info.deviceRegistration
+                            if reg.fastPairModelId:
+                                device_dict['modelId'] = reg.fastPairModelId
+                                device_dict['model'] = f"Fast Pair Model {reg.fastPairModelId}"
+
+                            # Add owner key version
+                            if reg.HasField('encryptedUserSecrets'):
+                                device_dict['ownerKeyVersion'] = reg.encryptedUserSecrets.ownerKeyVersion
+
+                        # Add location information if available (for additional_info)
+                        if info.HasField('locationInformation'):
+                            loc_info = info.locationInformation
+                            if loc_info.HasField('reports'):
+                                reports = loc_info.reports
+                                if reports.HasField('recentLocationAndNetworkLocations'):
+                                    device_dict['hasLocationReports'] = True
+
+                devices_data.append(device_dict)
+
             return devices_data if devices_data else []
-            
+
         except Exception as e:
             logger.error(f"Error fetching devices from API: {e}", exc_info=True)
             raise
@@ -98,7 +204,206 @@ class DeviceService:
             self._cache_timestamp = now
             
             return devices_data
-    
+
+    async def _background_location_updater(self):
+        """Background task that periodically updates location data for all devices"""
+        logger.info("Background location updater task started")
+
+        # Wait a bit before first update to let the service fully initialize
+        await asyncio.sleep(30)
+
+        while True:
+            try:
+                logger.info("Starting background location update cycle...")
+
+                # Get all devices
+                devices_data = await self._get_cached_devices()
+
+                if not devices_data:
+                    logger.warning("No devices found for location update")
+                    await asyncio.sleep(self._location_update_interval)
+                    continue
+
+                # Update locations for all devices
+                for device_data in devices_data:
+                    device_id = device_data.get('id', device_data.get('deviceId'))
+                    device_name = device_data.get('name', device_data.get('deviceName', 'Unknown'))
+
+                    if device_id:
+                        try:
+                            location_data = await self._fetch_location_for_device_internal(device_id, device_name)
+                            if location_data:
+                                logger.info(f"Updated location for device {device_name} ({device_id})")
+                            else:
+                                logger.debug(f"No location data available for device {device_name} ({device_id})")
+                        except Exception as e:
+                            logger.error(f"Error updating location for device {device_id}: {e}")
+
+                    # Small delay between devices to avoid overwhelming the API
+                    await asyncio.sleep(2)
+
+                logger.info(f"Background location update cycle complete. Next update in {self._location_update_interval} seconds")
+
+            except asyncio.CancelledError:
+                logger.info("Background location updater cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in background location updater: {e}", exc_info=True)
+
+            # Wait before next update cycle
+            await asyncio.sleep(self._location_update_interval)
+
+    async def _fetch_location_for_device_internal(self, device_id: str, device_name: str) -> Optional[Dict[str, Any]]:
+        """Internal method to fetch location data for a specific device
+
+        This runs in the background task and has access to the main event loop.
+        """
+        try:
+            # Check location cache first (5 minute TTL for locations)
+            now = datetime.now()
+            if (device_id in self._location_cache and
+                device_id in self._location_cache_timestamp and
+                (now - self._location_cache_timestamp[device_id]).total_seconds() < 300):
+                logger.debug(f"Returning cached location for device {device_id}")
+                return self._location_cache[device_id]
+
+            logger.info(f"Fetching fresh location data for device {device_id}...")
+
+            # Import necessary modules
+            from NovaApi.ExecuteAction.LocateTracker.location_request import create_location_request
+            from NovaApi.ExecuteAction.LocateTracker.decrypt_locations import retrieve_identity_key, is_mcu_tracker
+            from NovaApi.nova_request import nova_request
+            from NovaApi.scopes import NOVA_ACTION_API_SCOPE
+            from NovaApi.util import generate_random_uuid
+            from Auth.fcm_receiver import FcmReceiver
+            from ProtoDecoders.decoder import parse_device_update_protobuf
+            from ProtoDecoders import DeviceUpdate_pb2, Common_pb2
+            import hashlib
+            from KeyBackup.cloud_key_decryptor import decrypt_aes_gcm
+            from FMDNCrypto.foreign_tracker_cryptor import decrypt
+
+            # Initialize FCM receiver if not already done
+            if self._fcm_receiver is None:
+                self._fcm_receiver = FcmReceiver()
+
+            result = None
+            request_uuid = generate_random_uuid()
+
+            def handle_location_response(response):
+                nonlocal result
+                device_update = parse_device_update_protobuf(response)
+                if device_update.fcmMetadata.requestUuid == request_uuid:
+                    result = device_update
+
+            # Register for FCM updates
+            fcm_token = self._fcm_receiver.register_for_location_updates(handle_location_response)
+
+            # Create and send location request
+            hex_payload = create_location_request(device_id, fcm_token, request_uuid)
+            nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
+
+            # Wait for response (with timeout)
+            timeout = 30  # 30 seconds timeout
+            elapsed = 0
+            while result is None and elapsed < timeout:
+                await asyncio.sleep(0.5)
+                elapsed += 0.5
+
+            if result is None:
+                logger.warning(f"Timeout waiting for location response for device {device_id}")
+                return None
+
+            # Extract and decrypt location data
+            device_registration = result.deviceMetadata.information.deviceRegistration
+            identity_key = retrieve_identity_key(device_registration)
+            locations_proto = result.deviceMetadata.information.locationInformation.reports.recentLocationAndNetworkLocations
+            is_mcu = is_mcu_tracker(device_registration)
+
+            # Get recent location
+            recent_location = locations_proto.recentLocation
+            recent_location_time = locations_proto.recentLocationTimestamp
+
+            # Get network locations
+            network_locations = list(locations_proto.networkLocations)
+            network_locations_time = list(locations_proto.networkLocationTimestamps)
+
+            if locations_proto.HasField("recentLocation"):
+                network_locations.append(recent_location)
+                network_locations_time.append(recent_location_time)
+
+            # Process locations
+            location_data = None
+            for loc, time in zip(network_locations, network_locations_time):
+                if loc.status == Common_pb2.Status.SEMANTIC:
+                    # Semantic location (named place)
+                    location_data = {
+                        'type': 'semantic',
+                        'name': loc.semanticLocation.locationName,
+                        'timestamp': int(time.seconds),
+                        'status': 'SEMANTIC',
+                        'is_own_report': True
+                    }
+                else:
+                    # Encrypted geo location
+                    encrypted_location = loc.geoLocation.encryptedReport.encryptedLocation
+                    public_key_random = loc.geoLocation.encryptedReport.publicKeyRandom
+
+                    if public_key_random == b"":  # Own Report
+                        identity_key_hash = hashlib.sha256(identity_key).digest()
+                        decrypted_location = decrypt_aes_gcm(identity_key_hash, encrypted_location)
+                    else:
+                        time_offset = 0 if is_mcu else loc.geoLocation.deviceTimeOffset
+                        decrypted_location = decrypt(identity_key, encrypted_location, public_key_random, time_offset)
+
+                    # Parse decrypted location
+                    proto_loc = DeviceUpdate_pb2.Location()
+                    proto_loc.ParseFromString(decrypted_location)
+
+                    location_data = {
+                        'type': 'geo',
+                        'latitude': proto_loc.latitude / 1e7,
+                        'longitude': proto_loc.longitude / 1e7,
+                        'altitude': proto_loc.altitude,
+                        'accuracy': loc.geoLocation.accuracy,
+                        'timestamp': int(time.seconds),
+                        'status': str(loc.status),
+                        'is_own_report': loc.geoLocation.encryptedReport.isOwnReport
+                    }
+
+                # Return the most recent location (first one)
+                if location_data:
+                    break
+
+            # Cache the result
+            if location_data:
+                self._location_cache[device_id] = location_data
+                self._location_cache_timestamp[device_id] = now
+
+            return location_data
+
+        except Exception as e:
+            logger.error(f"Error fetching location for device {device_id}: {e}", exc_info=True)
+            return None
+
+    async def _fetch_location_for_device(self, device_id: str, device_name: str) -> Optional[Dict[str, Any]]:
+        """Get cached location data for a specific device
+
+        Note: Locations are updated automatically by the background task every 5 minutes.
+        This method returns cached data and does not trigger a fresh location request.
+        """
+        try:
+            # Return cached location if available
+            if device_id in self._location_cache:
+                logger.debug(f"Returning cached location for device {device_id}")
+                return self._location_cache[device_id]
+
+            logger.debug(f"No cached location available for device {device_id}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting cached location for device {device_id}: {e}", exc_info=True)
+            return None
+
     def _parse_device_basic(self, device_data: Dict[str, Any]) -> Device:
         """Parse basic device information"""
         try:
@@ -106,8 +411,8 @@ class DeviceService:
             device_id = device_data.get('id', device_data.get('deviceId', 'unknown'))
             name = device_data.get('name', device_data.get('deviceName', 'Unknown Device'))
             device_type = device_data.get('type', device_data.get('deviceType', 'UNKNOWN'))
-            
-            # Parse last seen timestamp
+
+            # Parse last seen timestamp from device data or location cache
             last_seen = None
             last_seen_str = device_data.get('lastSeenTimestamp', device_data.get('lastSeen'))
             if last_seen_str:
@@ -119,9 +424,18 @@ class DeviceService:
                         last_seen = datetime.fromisoformat(str(last_seen_str).replace('Z', '+00:00'))
                 except Exception as e:
                     logger.warning(f"Failed to parse last_seen timestamp: {e}")
-            
+
+            # If no last_seen in device_data, check location cache
+            if last_seen is None and device_id in self._location_cache:
+                location_data = self._location_cache[device_id]
+                if 'timestamp' in location_data:
+                    try:
+                        last_seen = datetime.fromtimestamp(location_data['timestamp'])
+                    except Exception as e:
+                        logger.warning(f"Failed to parse last_seen from location cache: {e}")
+
             status = device_data.get('status', 'UNKNOWN')
-            
+
             return Device(
                 device_id=str(device_id),
                 name=name,
@@ -233,14 +547,19 @@ class DeviceService:
             logger.error(f"Error getting all devices: {e}", exc_info=True)
             raise
     
-    async def get_device_detail(self, device_id: str) -> Optional[DeviceDetail]:
-        """Get detailed information for a specific device"""
+    async def get_device_detail(self, device_id: str, fetch_location: bool = True) -> Optional[DeviceDetail]:
+        """Get detailed information for a specific device
+
+        Args:
+            device_id: The device ID to fetch details for
+            fetch_location: Whether to fetch fresh location data (default: True)
+        """
         if not self.initialized:
             raise RuntimeError("Device service not initialized")
-        
+
         try:
             devices_data = await self._get_cached_devices()
-            
+
             # Find the device by ID
             device_data = None
             for data in devices_data:
@@ -248,15 +567,37 @@ class DeviceService:
                 if data_id == device_id:
                     device_data = data
                     break
-            
+
             if device_data is None:
                 logger.warning(f"Device with ID {device_id} not found")
                 return None
-            
+
+            # Fetch location data if requested
+            if fetch_location:
+                device_name = device_data.get('name', device_data.get('deviceName', 'Unknown'))
+                location_data = await self._fetch_location_for_device(device_id, device_name)
+
+                if location_data:
+                    # Add location data to device_data
+                    if location_data['type'] == 'geo':
+                        device_data['location'] = {
+                            'latitude': location_data['latitude'],
+                            'longitude': location_data['longitude'],
+                            'accuracy': location_data.get('accuracy'),
+                            'timestamp': location_data['timestamp']
+                        }
+                        device_data['lastSeenTimestamp'] = location_data['timestamp'] * 1000  # Convert to milliseconds
+                    elif location_data['type'] == 'semantic':
+                        device_data['location'] = {
+                            'semantic_name': location_data['name'],
+                            'timestamp': location_data['timestamp']
+                        }
+                        device_data['lastSeenTimestamp'] = location_data['timestamp'] * 1000
+
             device_detail = self._parse_device_detail(device_data)
             logger.info(f"Retrieved detail for device {device_id}")
             return device_detail
-            
+
         except Exception as e:
             logger.error(f"Error getting device detail: {e}", exc_info=True)
             raise
