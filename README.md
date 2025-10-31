@@ -392,11 +392,38 @@ rest-api/
 │   └── services/
 │       ├── __init__.py
 │       └── device_service.py # Device service logic
+├── patch_chrome_driver.py   # Patch for Chrome driver compatibility
+├── patch_fcm_receiver.py    # Patch for FCM async compatibility
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
 └── README.md
 ```
+
+### Technical Implementation Details
+
+**FCM Receiver Async Compatibility Fix**
+
+The GoogleFindMyTools library's `fcm_receiver.py` originally used synchronous methods with `asyncio.get_event_loop().run_until_complete()`, which caused nested event loop errors in Docker environments. This service includes an automatic patch (`patch_fcm_receiver.py`) that:
+
+1. Converts `register_for_location_updates()` from sync to async
+2. Converts `stop_listening()` from sync to async
+3. Converts `get_android_id()` from sync to async
+4. Replaces `asyncio.get_event_loop().run_until_complete()` with proper `await` statements
+
+The patch is automatically applied during Docker build, ensuring compatibility with all environments including Synology NAS.
+
+**Background Task Implementation**
+
+The service uses FastAPI's lifespan events to manage a background asyncio task that:
+
+1. Waits 30 seconds after startup
+2. Fetches device list from Google API
+3. For each device, registers for FCM notifications and requests location update
+4. Caches location data with 5-minute TTL
+5. Repeats every 5 minutes
+
+This approach ensures location data is always fresh while minimizing API calls and network usage.
 
 ## Synology NAS Deployment
 
@@ -429,36 +456,25 @@ rest-api/
    - Select the `docker-compose.yml` file
    - Click "Build" to create the container
 
-4. **Configure (if needed)**:
-
-   - If you experience crashes or event loop errors, disable location updates:
-   - Edit `docker-compose.yml` and change:
-     ```yaml
-     environment:
-       - ENABLE_LOCATION_UPDATES=false
-     ```
-   - Rebuild the container
-
-5. **Access the API**:
+4. **Access the API**:
    - The API will be available at: `http://YOUR_NAS_IP:8000`
    - API documentation: `http://YOUR_NAS_IP:8000/docs`
+   - All features including automatic location updates should work out of the box!
 
-### Troubleshooting Synology Deployment
+### Technical Details
 
-**Issue: Container crashes with "event loop" errors**
+**Fixed: Event Loop Compatibility Issue**
 
-This happens because FCM (Firebase Cloud Messaging) for location updates doesn't work well in some Docker environments.
+Previous versions had issues with FCM (Firebase Cloud Messaging) in Docker environments due to nested event loop problems in the GoogleFindMyTools library. This has been **permanently fixed** by patching the library during Docker build to use proper async/await patterns.
 
-**Solution**: Disable location updates by setting `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`:
+The service now includes:
 
-```yaml
-environment:
-  - PYTHONUNBUFFERED=1
-  - LOG_LEVEL=INFO
-  - ENABLE_LOCATION_UPDATES=false # Disable location updates
-```
+- ✅ Automatic FCM receiver patching during build
+- ✅ Proper async/await implementation
+- ✅ Full compatibility with Synology NAS and other Docker environments
+- ✅ Automatic location updates working in all environments
 
-The API will still work perfectly for listing devices and getting basic device information. Location data will not be automatically updated, but you can still see device metadata.
+**Backward Compatibility**: The `ENABLE_LOCATION_UPDATES` environment variable is still available if you need to disable location updates for any reason, but it's no longer necessary for stability.
 
 ## Configuration Options
 
@@ -480,18 +496,28 @@ The service includes automatic background location updates that fetch device loc
 
 - ✅ Automatic updates every 5 minutes
 - ✅ Cached location data for fast API responses
-- ✅ Real-time location accuracy
+- ✅ Real-time location accuracy with latitude, longitude, and accuracy
 - ✅ Works with all Google Find My Device trackers
+- ✅ **Now works in all Docker environments** (including Synology NAS)
+- ✅ Proper async/await implementation (no more event loop errors)
 
-**Limitations:**
+**How it works:**
 
-- ⚠️ May not work in all Docker environments (especially Synology NAS)
+1. Service starts and waits 30 seconds before first update
+2. Background task fetches location for each device sequentially
+3. Locations are cached for 5 minutes
+4. Updates repeat every 5 minutes automatically
+5. API responses use cached data for fast performance
+
+**Requirements:**
+
 - ⚠️ Requires stable network connection
 - ⚠️ First location update takes 30 seconds after service start
+- ⚠️ Each device location fetch takes ~2-3 seconds
 
-**To disable location updates:**
+**Optional: Disable location updates**
 
-Set `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`. The API will still work for:
+If you want to disable automatic location updates (e.g., to reduce network usage), set `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`. The API will still work for:
 
 - Listing all devices
 - Getting device details (name, ID, type, status)

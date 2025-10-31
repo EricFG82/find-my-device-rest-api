@@ -82,7 +82,7 @@ class DeviceService:
         # Stop FCM receiver if running
         if self._fcm_receiver:
             try:
-                self._fcm_receiver.stop_listening()
+                await self._fcm_receiver.stop_listening()
             except Exception as e:
                 logger.warning(f"Error stopping FCM receiver: {e}")
 
@@ -240,15 +240,6 @@ class DeviceService:
                                 logger.info(f"Updated location for device {device_name} ({device_id})")
                             else:
                                 logger.debug(f"No location data available for device {device_name} ({device_id})")
-                        except RuntimeError as e:
-                            if "event loop" in str(e).lower():
-                                logger.error(f"Event loop error - disabling location updates: {e}")
-                                # Disable location updates to prevent further crashes
-                                self._enable_location_updates = False
-                                logger.info("Location updates have been disabled due to event loop issues")
-                                break
-                            else:
-                                logger.error(f"Runtime error updating location for device {device_id}: {e}")
                         except Exception as e:
                             logger.error(f"Error updating location for device {device_id}: {e}")
 
@@ -256,11 +247,6 @@ class DeviceService:
                     await asyncio.sleep(2)
 
                 logger.info(f"Background location update cycle complete. Next update in {self._location_update_interval} seconds")
-
-                # Check if location updates were disabled during this cycle
-                if not self._enable_location_updates:
-                    logger.info("Location updates disabled, stopping background task")
-                    break
 
             except asyncio.CancelledError:
                 logger.info("Background location updater cancelled")
@@ -313,16 +299,13 @@ class DeviceService:
                 if device_update.fcmMetadata.requestUuid == request_uuid:
                     result = device_update
 
-            # Register for FCM updates
-            # Note: This may fail with "event loop already running" in some environments
+            # Register for FCM updates (now properly async)
             try:
-                fcm_token = self._fcm_receiver.register_for_location_updates(handle_location_response)
-            except RuntimeError as e:
-                if "event loop" in str(e).lower():
-                    logger.warning(f"FCM registration failed due to event loop issue: {e}")
-                    logger.info("Location fetching is not available in this environment")
-                    return None
-                raise
+                fcm_token = await self._fcm_receiver.register_for_location_updates(handle_location_response)
+            except Exception as e:
+                logger.error(f"FCM registration failed: {e}")
+                logger.info("Location fetching is not available")
+                return None
 
             # Create and send location request
             hex_payload = create_location_request(device_id, fcm_token, request_uuid)

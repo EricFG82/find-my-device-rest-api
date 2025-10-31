@@ -17,9 +17,11 @@ RUN apt-get update && apt-get install -y \
 # Clone GoogleFindMyTools repository
 RUN git clone https://github.com/leonboe1/GoogleFindMyTools.git /app/GoogleFindMyTools
 
-# Copy patch script and apply it
+# Copy patch scripts and apply them
 COPY patch_chrome_driver.py /app/
-RUN python3 /app/patch_chrome_driver.py
+COPY patch_fcm_receiver.py /app/
+RUN python3 /app/patch_chrome_driver.py && \
+    python3 /app/patch_fcm_receiver.py
 
 # Create directory for persistent auth data and symlink secrets.json
 RUN mkdir -p /app/auth_data && \

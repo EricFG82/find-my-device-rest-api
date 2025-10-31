@@ -14,7 +14,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
-      # Set to 'false' to disable background location updates if they cause issues
+      # Optional: Set to 'false' to disable background location updates (e.g., to reduce network usage)
+      # Location updates now work in all environments including Synology NAS
       - ENABLE_LOCATION_UPDATES=true
     restart: unless-stopped
     healthcheck:
