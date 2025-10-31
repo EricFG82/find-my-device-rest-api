@@ -7,8 +7,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount only the secrets file to persist authentication (not the entire Auth directory)
-      - ./auth_data:/app/auth_data
+      # Mount only the secrets.json file (not the entire Auth directory to preserve Python modules)
+      - ./auth_data/secretes.json:/app/GoogleFindMyTools/Auth/secrets.json
       # Optional: Mount app code for development
       # - ./app:/app/app
     environment:
