@@ -427,8 +427,12 @@ class DeviceService:
             if last_seen_str:
                 try:
                     if isinstance(last_seen_str, (int, float)):
-                        # Unix timestamp in milliseconds
-                        last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                        # Check if timestamp is in seconds or milliseconds
+                        # Timestamps > 10^10 are likely in milliseconds
+                        if last_seen_str > 10000000000:
+                            last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                        else:
+                            last_seen = datetime.fromtimestamp(last_seen_str)
                     else:
                         last_seen = datetime.fromisoformat(str(last_seen_str).replace('Z', '+00:00'))
                 except Exception as e:
@@ -439,6 +443,7 @@ class DeviceService:
                 location_data = self._location_cache[device_id]
                 if 'timestamp' in location_data:
                     try:
+                        # Location cache stores timestamps in seconds
                         last_seen = datetime.fromtimestamp(location_data['timestamp'])
                     except Exception as e:
                         logger.warning(f"Failed to parse last_seen from location cache: {e}")
@@ -489,12 +494,18 @@ class DeviceService:
                     if loc_time_str:
                         try:
                             if isinstance(loc_time_str, (int, float)):
-                                loc_timestamp = datetime.fromtimestamp(loc_time_str / 1000)
+                                # Check if timestamp is in seconds or milliseconds
+                                # Timestamps > 10^10 are likely in milliseconds
+                                if loc_time_str > 10000000000:
+                                    loc_timestamp = datetime.fromtimestamp(loc_time_str / 1000)
+                                else:
+                                    loc_timestamp = datetime.fromtimestamp(loc_time_str)
                             else:
                                 loc_timestamp = datetime.fromisoformat(str(loc_time_str).replace('Z', '+00:00'))
-                        except Exception:
+                        except Exception as e:
+                            logger.warning(f"Failed to parse location timestamp {loc_time_str}: {e}")
                             pass
-                    
+
                     if lat is not None and lon is not None:
                         location = Location(
                             latitude=float(lat),
@@ -511,7 +522,12 @@ class DeviceService:
             if last_seen_str:
                 try:
                     if isinstance(last_seen_str, (int, float)):
-                        last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                        # Check if timestamp is in seconds or milliseconds
+                        # Timestamps > 10^10 are likely in milliseconds
+                        if last_seen_str > 10000000000:
+                            last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                        else:
+                            last_seen = datetime.fromtimestamp(last_seen_str)
                     else:
                         last_seen = datetime.fromisoformat(str(last_seen_str).replace('Z', '+00:00'))
                 except Exception as e:

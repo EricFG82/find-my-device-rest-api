@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     volumes:
       # Mount only the secrets.json file (not the entire Auth directory to preserve Python modules)
-      - ./auth_data/secretes.json:/app/GoogleFindMyTools/Auth/secrets.json
+      - ./auth_data/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json
       # Optional: Mount app code for development
       # - ./app:/app/app
     environment:

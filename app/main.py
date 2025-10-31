@@ -14,8 +14,10 @@ from app.models import Device, DeviceDetail, ErrorResponse, HealthResponse
 from app.services.device_service import DeviceService
 
 # Configure logging
+import os
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)

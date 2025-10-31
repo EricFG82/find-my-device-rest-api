@@ -427,39 +427,52 @@ This approach ensures location data is always fresh while minimizing API calls a
 
 ## Synology NAS Deployment
 
-### Prerequisites
+### ⚠️ Important: Authentication Required First
 
-- Synology NAS with Container Manager (formerly Docker) installed
-- SSH access to your NAS (optional, for command-line setup)
-- Completed authentication (Method 1 recommended - authenticate on your computer first)
+**You MUST authenticate on your Mac/PC before deploying to Synology NAS.** The Docker container cannot perform interactive authentication.
 
-### Deployment Steps
+### Quick Start
 
-1. **Authenticate on your computer** (Method 1 from above):
+1. **Authenticate on your Mac/PC** (see "Setup and Installation" section above)
+2. **Copy `secrets.json`** to `rest-api/auth_data/` directory
+3. **Upload entire `rest-api` folder** to your Synology NAS
+4. **Deploy using Container Manager**
 
-   - Clone GoogleFindMyTools on your Mac/PC
-   - Run `python3 main.py` to authenticate
-   - Copy the generated `Auth/secrets.json` file
+### 📖 Detailed Setup Guide
 
-2. **Prepare on Synology NAS**:
+For complete step-by-step instructions, troubleshooting, and common errors, see:
 
-   - Create a folder: `/docker/google-findmy-api/auth_data`
-   - Upload the `secrets.json` file to this folder
-   - Upload the entire `rest-api` directory to `/docker/google-findmy-api/`
+**[SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md)** - Comprehensive Synology deployment guide
+
+### Common Error: "EOFError: EOF when reading a line"
+
+If you see this error in Container Manager logs, it means the `secrets.json` file is missing or not properly mounted. See [SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md) for the solution.
+
+### Quick Deployment Steps
+
+1. **Authenticate on your computer**:
+
+   ```bash
+   cd GoogleFindMyTools
+   python3 main.py
+   cp Auth/secrets.json ../rest-api/auth_data/
+   ```
+
+2. **Upload to Synology**:
+
+   - Upload entire `rest-api` folder to `/docker/google-findmy-api/`
+   - Verify `secrets.json` is in `/docker/google-findmy-api/rest-api/auth_data/`
 
 3. **Deploy using Container Manager**:
 
-   - Open Container Manager on your Synology
-   - Go to "Project" tab
-   - Click "Create" and select "Create docker-compose.yml"
-   - Navigate to `/docker/google-findmy-api/rest-api/`
-   - Select the `docker-compose.yml` file
-   - Click "Build" to create the container
+   - Open Container Manager → Project tab
+   - Create new project from `/docker/google-findmy-api/rest-api/docker-compose.yml`
+   - Build and start
 
 4. **Access the API**:
-   - The API will be available at: `http://YOUR_NAS_IP:8000`
-   - API documentation: `http://YOUR_NAS_IP:8000/docs`
-   - All features including automatic location updates should work out of the box!
+   - API: `http://YOUR_NAS_IP:8000`
+   - Docs: `http://YOUR_NAS_IP:8000/docs`
+   - All features including automatic location updates work out of the box!
 
 ### Technical Details
 
