@@ -4,12 +4,18 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
 ## Features
 
-- **List all devices**: Get a list of all devices registered in Google Find My Device
-- **Device details**: Get detailed information for a specific device including location, battery level, and status
+- **List all devices**: Get a list of all devices registered in Google Find My Device with last seen timestamps
+- **Device details**: Get detailed information for a specific device including:
+  - Real-time location data (latitude, longitude, accuracy)
+  - Device metadata (model, image URL, identifier type)
+  - Last seen timestamp
+  - Device status
+- **Automatic location updates**: Background task that fetches device locations every 5 minutes (can be disabled)
 - **Automatic API documentation**: Interactive API docs at `/docs` (Swagger UI) and `/redoc` (ReDoc)
 - **Health checks**: Built-in health check endpoint for monitoring
-- **Caching**: Intelligent caching to reduce API calls
+- **Intelligent caching**: 60-second cache for device list, 5-minute cache for locations
 - **Docker support**: Easy deployment with Docker and docker-compose
+- **Synology NAS compatible**: Works on Synology NAS with Container Manager
 
 ## API Endpoints
 
@@ -391,6 +397,107 @@ rest-api/
 ├── requirements.txt
 └── README.md
 ```
+
+## Synology NAS Deployment
+
+### Prerequisites
+
+- Synology NAS with Container Manager (formerly Docker) installed
+- SSH access to your NAS (optional, for command-line setup)
+- Completed authentication (Method 1 recommended - authenticate on your computer first)
+
+### Deployment Steps
+
+1. **Authenticate on your computer** (Method 1 from above):
+
+   - Clone GoogleFindMyTools on your Mac/PC
+   - Run `python3 main.py` to authenticate
+   - Copy the generated `Auth/secrets.json` file
+
+2. **Prepare on Synology NAS**:
+
+   - Create a folder: `/docker/google-findmy-api/auth_data`
+   - Upload the `secrets.json` file to this folder
+   - Upload the entire `rest-api` directory to `/docker/google-findmy-api/`
+
+3. **Deploy using Container Manager**:
+
+   - Open Container Manager on your Synology
+   - Go to "Project" tab
+   - Click "Create" and select "Create docker-compose.yml"
+   - Navigate to `/docker/google-findmy-api/rest-api/`
+   - Select the `docker-compose.yml` file
+   - Click "Build" to create the container
+
+4. **Configure (if needed)**:
+
+   - If you experience crashes or event loop errors, disable location updates:
+   - Edit `docker-compose.yml` and change:
+     ```yaml
+     environment:
+       - ENABLE_LOCATION_UPDATES=false
+     ```
+   - Rebuild the container
+
+5. **Access the API**:
+   - The API will be available at: `http://YOUR_NAS_IP:8000`
+   - API documentation: `http://YOUR_NAS_IP:8000/docs`
+
+### Troubleshooting Synology Deployment
+
+**Issue: Container crashes with "event loop" errors**
+
+This happens because FCM (Firebase Cloud Messaging) for location updates doesn't work well in some Docker environments.
+
+**Solution**: Disable location updates by setting `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`:
+
+```yaml
+environment:
+  - PYTHONUNBUFFERED=1
+  - LOG_LEVEL=INFO
+  - ENABLE_LOCATION_UPDATES=false # Disable location updates
+```
+
+The API will still work perfectly for listing devices and getting basic device information. Location data will not be automatically updated, but you can still see device metadata.
+
+## Configuration Options
+
+### Environment Variables
+
+You can configure the service using environment variables in `docker-compose.yml`:
+
+| Variable                  | Default | Description                                          |
+| ------------------------- | ------- | ---------------------------------------------------- |
+| `PYTHONUNBUFFERED`        | `1`     | Enable Python unbuffered output for better logging   |
+| `LOG_LEVEL`               | `INFO`  | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)  |
+| `ENABLE_LOCATION_UPDATES` | `true`  | Enable/disable automatic background location updates |
+
+### Location Updates
+
+The service includes automatic background location updates that fetch device locations every 5 minutes using FCM (Firebase Cloud Messaging).
+
+**Features:**
+
+- ✅ Automatic updates every 5 minutes
+- ✅ Cached location data for fast API responses
+- ✅ Real-time location accuracy
+- ✅ Works with all Google Find My Device trackers
+
+**Limitations:**
+
+- ⚠️ May not work in all Docker environments (especially Synology NAS)
+- ⚠️ Requires stable network connection
+- ⚠️ First location update takes 30 seconds after service start
+
+**To disable location updates:**
+
+Set `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`. The API will still work for:
+
+- Listing all devices
+- Getting device details (name, ID, type, status)
+- Device metadata (model, image URL, etc.)
+
+Location data will not be automatically fetched, but the service will remain stable.
 
 ## Security Considerations
 
