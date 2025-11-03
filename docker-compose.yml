@@ -13,9 +13,19 @@ services:
       # - ./app:/app/app
     environment:
       - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=INFO
-      # Optional: Set to 'false' to disable background location updates (e.g., to reduce network usage)
-      # Location updates now work in all environments including Synology NAS
+      - LOG_LEVEL=DEBUG
+
+      # Device Service Configuration
+      # Cache TTL for device list in seconds (default: 60)
+      - DEVICE_CACHE_TTL=60
+
+      # Location update interval in seconds (default: 300 = 5 minutes)
+      # Lower values = more frequent updates but more API calls
+      # Recommended: 180-600 seconds (3-10 minutes)
+      - LOCATION_UPDATE_INTERVAL=300
+
+      # Enable/disable background location updates (default: true)
+      # Set to 'false' to disable automatic location updates
       - ENABLE_LOCATION_UPDATES=true
     restart: unless-stopped
     healthcheck:

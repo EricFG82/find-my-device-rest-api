@@ -23,9 +23,16 @@ COPY patch_fcm_receiver.py /app/
 RUN python3 /app/patch_chrome_driver.py && \
     python3 /app/patch_fcm_receiver.py
 
-# Create directory for persistent auth data and symlink secrets.json
-RUN mkdir -p /app/auth_data && \
-    ln -sf /app/auth_data/secrets.json /app/GoogleFindMyTools/Auth/secrets.json
+# Copy auth_data directory if it exists (optional - for standalone deployment without volume mounts)
+# This will be overridden by volume mount if specified in docker-compose.yml
+# The .dockerignore file should NOT exclude auth_data if you want to include it
+COPY --chown=root:root auth_data /app/auth_data
+
+# Create symlink to support both deployment methods:
+# 1. Standalone: Uses the copied secrets.json from /app/auth_data/
+# 2. With volume mount to /app/auth_data: Symlink points to mounted directory
+# 3. With direct file mount to /app/GoogleFindMyTools/Auth/secrets.json: Symlink is overridden
+RUN ln -sf /app/auth_data/secrets.json /app/GoogleFindMyTools/Auth/secrets.json
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
@@ -42,6 +49,11 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app:/app/GoogleFindMyTools
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+
+# Device service configuration (can be overridden in docker-compose.yml)
+ENV DEVICE_CACHE_TTL=60
+ENV LOCATION_UPDATE_INTERVAL=300
+ENV ENABLE_LOCATION_UPDATES=true
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

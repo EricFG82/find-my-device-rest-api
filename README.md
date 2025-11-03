@@ -287,10 +287,80 @@ fetch("http://localhost:8000/api/v1/devices")
 
 ### Environment Variables
 
-You can configure the service using environment variables:
+You can configure the service using environment variables in `docker-compose.yml`:
 
-- `LOG_LEVEL`: Logging level (default: INFO)
-- `CACHE_TTL`: Cache time-to-live in seconds (default: 60)
+#### Core Settings
+
+- `LOG_LEVEL`: Logging level (default: `INFO`, options: `DEBUG`, `INFO`, `WARNING`, `ERROR`)
+- `PYTHONUNBUFFERED`: Set to `1` to see logs in real-time
+
+#### Device Service Settings
+
+- **`DEVICE_CACHE_TTL`**: Cache time-to-live for device list in seconds (default: `60`)
+
+  - How long to cache the list of devices before fetching fresh data
+  - Lower values = more API calls but fresher data
+  - Recommended: 30-120 seconds
+
+- **`LOCATION_UPDATE_INTERVAL`**: Background location update interval in seconds (default: `300` = 5 minutes)
+
+  - How often to automatically fetch fresh location data for all devices
+  - Lower values = more frequent updates but more API calls and battery drain
+  - Recommended: 180-600 seconds (3-10 minutes)
+  - **Note**: This is independent of Home Assistant's polling interval
+
+- **`ENABLE_LOCATION_UPDATES`**: Enable/disable background location updates (default: `true`)
+  - Set to `false` to disable automatic location fetching
+  - When disabled, locations are only fetched on-demand when you call the API
+  - Useful for reducing network usage or battery drain
+
+#### Example Configuration
+
+```yaml
+environment:
+  - LOG_LEVEL=DEBUG
+  - DEVICE_CACHE_TTL=60
+  - LOCATION_UPDATE_INTERVAL=180 # Update every 3 minutes
+  - ENABLE_LOCATION_UPDATES=true
+```
+
+### How Location Updates Work
+
+The service uses a two-tier caching system:
+
+1. **Device List Cache** (`DEVICE_CACHE_TTL`):
+
+   - Caches the list of devices (names, IDs, basic info)
+   - Default: 60 seconds
+   - Lightweight, can be refreshed frequently
+
+2. **Location Cache** (`LOCATION_UPDATE_INTERVAL`):
+   - Background task that fetches actual GPS coordinates
+   - Default: 300 seconds (5 minutes)
+   - More resource-intensive, should be refreshed less frequently
+
+**Example Scenario:**
+
+- `DEVICE_CACHE_TTL=60` and `LOCATION_UPDATE_INTERVAL=300`
+- Device list refreshes every 60 seconds
+- Locations update every 5 minutes in the background
+- Home Assistant polls every 60 seconds and gets the latest cached location
+
+**For Faster Updates:**
+
+```yaml
+environment:
+  - DEVICE_CACHE_TTL=30
+  - LOCATION_UPDATE_INTERVAL=120 # Update every 2 minutes
+```
+
+**For Battery Conservation:**
+
+```yaml
+environment:
+  - DEVICE_CACHE_TTL=120
+  - LOCATION_UPDATE_INTERVAL=600 # Update every 10 minutes
+```
 
 ### Docker Compose Configuration
 

@@ -5,7 +5,7 @@ Device service for interacting with GoogleFindMyTools
 import logging
 import asyncio
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import os
 
@@ -24,15 +24,28 @@ class DeviceService:
         self.initialized = False
         self._devices_cache: Optional[List[Dict[str, Any]]] = None
         self._cache_timestamp: Optional[datetime] = None
-        self._cache_ttl = 60  # Cache TTL in seconds
+
+        # Configurable cache TTL (default: 60 seconds)
+        self._cache_ttl = int(os.getenv('DEVICE_CACHE_TTL', '60'))
+
         self._lock = asyncio.Lock()
         self._device_list_protobuf = None  # Store full protobuf for location fetching
         self._location_cache: Dict[str, Dict[str, Any]] = {}  # Cache locations by device_id
         self._location_cache_timestamp: Dict[str, datetime] = {}  # Track cache time per device
         self._background_task: Optional[asyncio.Task] = None  # Background location update task
-        self._location_update_interval = 300  # Update locations every 5 minutes
+
+        # Configurable location update interval (default: 300 seconds = 5 minutes)
+        self._location_update_interval = int(os.getenv('LOCATION_UPDATE_INTERVAL', '300'))
+
         self._fcm_receiver = None  # Shared FCM receiver instance
+
+        # Enable/disable background location updates (default: true)
         self._enable_location_updates = os.getenv('ENABLE_LOCATION_UPDATES', 'true').lower() == 'true'
+
+        logger.info(f"DeviceService configuration:")
+        logger.info(f"  - Device cache TTL: {self._cache_ttl} seconds")
+        logger.info(f"  - Location update interval: {self._location_update_interval} seconds")
+        logger.info(f"  - Background location updates: {'enabled' if self._enable_location_updates else 'disabled'}")
         
     async def initialize(self):
         """Initialize the device service"""
@@ -328,6 +341,11 @@ class DeviceService:
             locations_proto = result.deviceMetadata.information.locationInformation.reports.recentLocationAndNetworkLocations
             is_mcu = is_mcu_tracker(device_registration)
 
+            # Check for battery information in device metadata
+            logger.debug(f"Device metadata fields: {result.deviceMetadata.ListFields()}")
+            if result.deviceMetadata.HasField('information'):
+                logger.debug(f"Device information fields: {result.deviceMetadata.information.ListFields()}")
+
             # Get recent location
             recent_location = locations_proto.recentLocation
             recent_location_time = locations_proto.recentLocationTimestamp
@@ -430,9 +448,9 @@ class DeviceService:
                         # Check if timestamp is in seconds or milliseconds
                         # Timestamps > 10^10 are likely in milliseconds
                         if last_seen_str > 10000000000:
-                            last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                            last_seen = datetime.fromtimestamp(last_seen_str / 1000, tz=timezone.utc)
                         else:
-                            last_seen = datetime.fromtimestamp(last_seen_str)
+                            last_seen = datetime.fromtimestamp(last_seen_str, tz=timezone.utc)
                     else:
                         last_seen = datetime.fromisoformat(str(last_seen_str).replace('Z', '+00:00'))
                 except Exception as e:
@@ -444,7 +462,7 @@ class DeviceService:
                 if 'timestamp' in location_data:
                     try:
                         # Location cache stores timestamps in seconds
-                        last_seen = datetime.fromtimestamp(location_data['timestamp'])
+                        last_seen = datetime.fromtimestamp(location_data['timestamp'], tz=timezone.utc)
                     except Exception as e:
                         logger.warning(f"Failed to parse last_seen from location cache: {e}")
 
@@ -473,6 +491,7 @@ class DeviceService:
             # Extract battery level
             battery_level = None
             battery_data = device_data.get('battery', device_data.get('batteryLevel'))
+            logger.debug(f"Device {name}: battery_data = {battery_data}, device_data keys = {list(device_data.keys())}")
             if battery_data is not None:
                 try:
                     battery_level = int(battery_data)
@@ -497,9 +516,9 @@ class DeviceService:
                                 # Check if timestamp is in seconds or milliseconds
                                 # Timestamps > 10^10 are likely in milliseconds
                                 if loc_time_str > 10000000000:
-                                    loc_timestamp = datetime.fromtimestamp(loc_time_str / 1000)
+                                    loc_timestamp = datetime.fromtimestamp(loc_time_str / 1000, tz=timezone.utc)
                                 else:
-                                    loc_timestamp = datetime.fromtimestamp(loc_time_str)
+                                    loc_timestamp = datetime.fromtimestamp(loc_time_str, tz=timezone.utc)
                             else:
                                 loc_timestamp = datetime.fromisoformat(str(loc_time_str).replace('Z', '+00:00'))
                         except Exception as e:
@@ -525,9 +544,9 @@ class DeviceService:
                         # Check if timestamp is in seconds or milliseconds
                         # Timestamps > 10^10 are likely in milliseconds
                         if last_seen_str > 10000000000:
-                            last_seen = datetime.fromtimestamp(last_seen_str / 1000)
+                            last_seen = datetime.fromtimestamp(last_seen_str / 1000, tz=timezone.utc)
                         else:
-                            last_seen = datetime.fromtimestamp(last_seen_str)
+                            last_seen = datetime.fromtimestamp(last_seen_str, tz=timezone.utc)
                     else:
                         last_seen = datetime.fromisoformat(str(last_seen_str).replace('Z', '+00:00'))
                 except Exception as e:
