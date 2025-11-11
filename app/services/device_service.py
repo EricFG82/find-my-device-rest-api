@@ -631,6 +631,11 @@ class DeviceService:
                             'timestamp': location_data['timestamp']
                         }
                         device_data['lastSeenTimestamp'] = location_data['timestamp'] * 1000  # Convert to milliseconds
+
+                        # Generate Google Maps link
+                        lat = location_data['latitude']
+                        lon = location_data['longitude']
+                        device_data['google_maps_link'] = f"https://www.google.com/maps?q={lat},{lon}"
                     elif location_data['type'] == 'semantic':
                         device_data['location'] = {
                             'semantic_name': location_data['name'],
