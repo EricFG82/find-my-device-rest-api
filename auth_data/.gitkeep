@@ -1,0 +1,4 @@
+# This file ensures the auth_data directory exists in the repository
+# Place your secrets.json file in this directory for standalone Docker builds
+# The secrets.json file is gitignored for security
+

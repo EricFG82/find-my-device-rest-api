@@ -23,12 +23,21 @@ COPY patch_fcm_receiver.py /app/
 RUN python3 /app/patch_chrome_driver.py && \
     python3 /app/patch_fcm_receiver.py
 
-# Create auth_data directory (will be populated by volume mount)
-RUN mkdir -p /app/auth_data
+# Create auth_data and Auth directories
+RUN mkdir -p /app/auth_data /app/GoogleFindMyTools/Auth
 
-# Create symlink to support volume mount deployment
-# The secrets.json will be mounted at /app/GoogleFindMyTools/Auth/secrets.json via docker-compose.yml
-RUN mkdir -p /app/GoogleFindMyTools/Auth
+# Copy auth_data directory (includes secrets.json if available)
+# The .dockerignore allows only secrets.json and .gitkeep to be copied
+# This supports two deployment methods:
+# 1. Standalone: If secrets.json exists in auth_data/, it will be copied into the image
+# 2. With volume mount: Volume mount will override the copied files at runtime
+COPY --chown=root:root auth_data /app/auth_data
+
+# Create symlink to support both deployment methods:
+# 1. Standalone: Uses the copied secrets.json from /app/auth_data/
+# 2. With volume mount to /app/auth_data: Symlink points to mounted directory
+# 3. With direct file mount to /app/GoogleFindMyTools/Auth/secrets.json: Symlink is overridden
+RUN ln -sf /app/auth_data/secrets.json /app/GoogleFindMyTools/Auth/secrets.json
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .

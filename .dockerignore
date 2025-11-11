@@ -19,6 +19,9 @@ env/
 htmlcov/
 *.log
 .DS_Store
-auth_data/
+# Ignore auth_data directory except secrets.json and .gitkeep
+auth_data/*
+!auth_data/secrets.json
+!auth_data/.gitkeep
 GoogleFindMyTools/
 
