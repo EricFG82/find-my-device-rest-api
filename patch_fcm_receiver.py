@@ -40,6 +40,7 @@ def patch_fcm_receiver():
 
         if not self._listening:
             await self._register_for_fcm_and_listen()
+            self._listening = True
 
         self.location_update_callbacks.append(callback)
 
@@ -63,6 +64,7 @@ def patch_fcm_receiver():
 
         if not self._listening:
             await self._register_for_fcm_and_listen()
+            self._listening = True
 
         self.location_update_callbacks.append(callback)
 
@@ -117,6 +119,7 @@ def patch_fcm_receiver():
 
         if self.credentials is None:
             await self._register_for_fcm_and_listen()
+            self._listening = True
 
         return self.credentials['gcm']['android_id']'''
 
@@ -136,6 +139,7 @@ def patch_fcm_receiver():
 
         if self.credentials is None:
             await self._register_for_fcm_and_listen()
+            self._listening = True
 
         return self.credentials['gcm']['android_id']'''
 
