@@ -1,0 +1,39 @@
+services:
+  google-findmy-api:
+    image: ericfg82/google-findmy-api:latest
+    container_name: google-findmy-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Point this at a real secrets.json on the NAS (obtained via GoogleFindMyTools auth,
+      # see AUTHENTICATION.md). The image never contains secrets.json - it's mounted here.
+      - /volume1/docker/google-findmy-api/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+
+      # Device Service Configuration
+      # Cache TTL for device list in seconds (default: 60)
+      - DEVICE_CACHE_TTL=60
+
+      # Location update interval in seconds (default: 300 = 5 minutes)
+      # Lower values = more frequent updates but more API calls
+      # Recommended: 180-600 seconds (3-10 minutes)
+      - LOCATION_UPDATE_INTERVAL=300
+
+      # Enable/disable background location updates (default: true)
+      # Set to 'false' to disable automatic location updates
+      - ENABLE_LOCATION_UPDATES=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - findmy-network
+
+networks:
+  findmy-network:
+    driver: bridge
