@@ -2,6 +2,8 @@
 
 A REST API service that exposes Google Find My Device functionality using the [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools) library.
 
+> Deploying a pre-built image via Portainer, or cutting a new release? See [RELEASING.md](RELEASING.md).
+
 ## Features
 
 - **List all devices**: Get a list of all devices registered in Google Find My Device with last seen timestamps
