@@ -120,6 +120,15 @@ class DeviceService:
             # Execute in thread pool to avoid blocking
             result_hex = await loop.run_in_executor(None, request_device_list)
 
+            if not result_hex:
+                # nova_request() returns None (instead of raising) when Google's Nova API
+                # responds with a non-200 status, e.g. an expired/revoked auth token.
+                raise RuntimeError(
+                    "Nova API device list request failed (no response from Google). "
+                    "This usually means the authentication token expired or was revoked - "
+                    "try re-authenticating (see AUTHENTICATION.md)."
+                )
+
             # Parse the protobuf response
             device_list = parse_device_list_protobuf(result_hex)
 
