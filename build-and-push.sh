@@ -50,6 +50,8 @@ fi
 
 docker buildx build \
     --platform "$PLATFORMS" \
+    --provenance=false \
+    --sbom=false \
     "${BUILD_TAGS[@]}" \
     --push \
     .
