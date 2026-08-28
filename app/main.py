@@ -91,7 +91,20 @@ async def root():
 @app.get(
     "/health",
     response_model=HealthResponse,
-    responses={503: {"model": HealthResponse, "description": "Service unhealthy"}}
+    responses={
+        503: {
+            "model": HealthResponse,
+            "description": "Service unhealthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "unhealthy",
+                        "message": "Authentication not configured: secrets.json is missing, empty, or invalid (no authenticated username found). Check the volume/file mount for secrets.json."
+                    }
+                }
+            }
+        }
+    }
 )
 async def health_check():
     """Health check endpoint"""
