@@ -22,6 +22,7 @@ class DeviceService:
     
     def __init__(self):
         self.initialized = False
+        self.init_error: Optional[str] = None
         self._devices_cache: Optional[List[Dict[str, Any]]] = None
         self._cache_timestamp: Optional[datetime] = None
 
@@ -62,10 +63,17 @@ class DeviceService:
             logger.info("Verifying authentication...")
             try:
                 username = get_username()
+                if not username:
+                    # get_username() returns "" (does not raise) when secrets.json is
+                    # missing, empty, or has no cached username - treat that as a failure.
+                    raise RuntimeError(
+                        "secrets.json is missing, empty, or invalid (no authenticated "
+                        "username found). Check the volume/file mount for secrets.json."
+                    )
                 logger.info(f"Authentication verified for user: {username}")
             except Exception as auth_error:
                 logger.error(f"Authentication failed: {auth_error}")
-                raise Exception("Authentication not configured. Please run authentication first.")
+                raise Exception(f"Authentication not configured: {auth_error}")
 
             self.initialized = True
             logger.info("Device service initialized successfully")
@@ -79,8 +87,9 @@ class DeviceService:
 
         except Exception as e:
             logger.error(f"Failed to initialize device service: {e}", exc_info=True)
+            self.init_error = str(e)
             raise
-    
+
     async def cleanup(self):
         """Cleanup resources"""
         # Stop background task
@@ -589,7 +598,7 @@ class DeviceService:
     async def get_all_devices(self) -> List[Device]:
         """Get all devices"""
         if not self.initialized:
-            raise RuntimeError("Device service not initialized")
+            raise RuntimeError(f"Device service not initialized: {self.init_error or 'unknown initialization error'}")
         
         try:
             devices_data = await self._get_cached_devices()
@@ -608,7 +617,7 @@ class DeviceService:
             fetch_location: Whether to fetch fresh location data (default: True)
         """
         if not self.initialized:
-            raise RuntimeError("Device service not initialized")
+            raise RuntimeError(f"Device service not initialized: {self.init_error or 'unknown initialization error'}")
 
         try:
             devices_data = await self._get_cached_devices()

@@ -33,13 +33,15 @@ async def lifespan(app: FastAPI):
     
     # Startup
     logger.info("Starting GoogleFindMyTools REST API Service...")
+    device_service = DeviceService()
     try:
-        device_service = DeviceService()
         await device_service.initialize()
         logger.info("Device service initialized successfully")
     except Exception as e:
+        # Don't crash the process here: keep serving so /health can report the
+        # specific failure reason (e.g. missing secrets.json) instead of the
+        # container just crash-looping with no visible status.
         logger.error(f"Failed to initialize device service: {e}")
-        raise
     
     yield
     
@@ -86,23 +88,28 @@ async def root():
     }
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    responses={503: {"model": HealthResponse, "description": "Service unhealthy"}}
+)
 async def health_check():
     """Health check endpoint"""
     if device_service is None:
-        raise HTTPException(
+        return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service not initialized"
+            content=HealthResponse(status="unhealthy", message="Service not initialized").model_dump()
         )
-    
+
     is_healthy = await device_service.health_check()
-    
+
     if not is_healthy:
-        raise HTTPException(
+        reason = device_service.init_error or "Service failed to initialize (unknown reason)"
+        return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Service is unhealthy"
+            content=HealthResponse(status="unhealthy", message=reason).model_dump()
         )
-    
+
     return HealthResponse(
         status="healthy",
         message="Service is running normally"
