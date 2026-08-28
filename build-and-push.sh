@@ -9,6 +9,10 @@
 # Usage:
 #   ./build-and-push.sh [tag]
 #
+# If no tag is given, it defaults to the git tag on HEAD (e.g. v1.1.0) so a
+# tagged release always gets its own version tag pushed alongside :latest -
+# not just :latest. If HEAD isn't tagged, it falls back to :latest only.
+#
 # Env overrides:
 #   DOCKER_USER   Docker Hub username (default: ericfg82)
 #   IMAGE_NAME    Repository name     (default: google-findmy-api)
@@ -19,8 +23,19 @@ set -euo pipefail
 DOCKER_USER="${DOCKER_USER:-ericfg82}"
 IMAGE_NAME="${IMAGE_NAME:-google-findmy-api}"
 PLATFORMS="${PLATFORMS:-linux/amd64}"
-TAG="${1:-latest}"
 FULL_IMAGE="docker.io/${DOCKER_USER}/${IMAGE_NAME}"
+
+TAG="${1:-}"
+if [ -z "$TAG" ]; then
+    TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
+    if [ -z "$TAG" ]; then
+        echo "No tag given and HEAD has no git tag - publishing :latest only."
+        echo "Tip: 'git tag vX.Y.Z' first, or pass a tag explicitly, to also publish a version tag."
+        TAG="latest"
+    else
+        echo "Using git tag at HEAD: ${TAG}"
+    fi
+fi
 
 cd "$(dirname "$0")"
 
