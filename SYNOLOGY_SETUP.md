@@ -1,5 +1,10 @@
 # Synology NAS Setup Guide
 
+> This guide covers **building the image on the NAS itself** via Container
+> Manager's "Project" feature. If you'd rather pull a pre-built private image
+> through Portainer instead (faster, no build step on the NAS), see
+> [RELEASING.md](RELEASING.md) and [`docker-compose.portainer.yml`](docker-compose.portainer.yml).
+
 ## ⚠️ Common Error: "EOFError: EOF when reading a line"
 
 If you see this error in your Synology Container Manager logs:
@@ -270,7 +275,7 @@ INFO - Updated location for device Device-Name
 
 ```bash
 $ curl http://SYNOLOGY-IP:8000/health
-{"status":"healthy"}
+{"status":"healthy","message":"Service is running normally"}
 
 $ curl http://SYNOLOGY-IP:8000/api/v1/devices
 [

@@ -1,5 +1,11 @@
 # Technical Fix: FCM Receiver Async Compatibility
 
+> **Update**: The fix described below (making `fcm_receiver.py` async) was correct
+> but incomplete - it dropped the `self._listening = True` state update that the
+> original sync code had, so the receiver reconnected to MCS on *every* location
+> request instead of reusing one connection. See the "Follow-up fix" section at the
+> end of this document.
+
 ## Problem Statement
 
 The Google Find My Device REST API service was crashing on Synology NAS (and potentially other Docker environments) with the following error:
@@ -186,4 +192,42 @@ However, the current patch approach is clean, maintainable, and works perfectly.
 The "Synology NAS crash" was actually a fundamental async/await compatibility issue in the GoogleFindMyTools library. By patching the library to use proper async patterns, we've created a robust solution that works in all environments.
 
 **The service is now production-ready for deployment on any platform, including Synology NAS!** 🚀
+
+## Follow-up fix (v1.1.0): `_listening` was never set to `True`
+
+The patch above converted `register_for_location_updates()` to:
+
+```python
+async def register_for_location_updates(self, callback):
+    if not self._listening:
+        await self._register_for_fcm_and_listen()
+
+    self.location_update_callbacks.append(callback)
+    return self.credentials['fcm']['registration']['token']
+```
+
+The **original** sync version set `self._listening = True` after connecting (inside
+`_start_listener_in_background()`, which the async rewrite stopped calling). The
+patch never added that assignment back anywhere. Since `self._listening` stayed
+`False` forever, `if not self._listening` was always true, so **every single
+location request** - not just the first - called `_register_for_fcm_and_listen()`
+again, opening a brand new MCS connection and a new `_listen()` task on top of the
+previous one (`FcmPushClient.start()` overwrites `self.tasks` without cancelling
+what was there before).
+
+With multiple devices in one background update cycle, this reliably produced:
+- Repeated `Successfully logged in to MCS endpoint` (once per device instead of once
+  per cycle)
+- `Task was destroyed but it is pending!` warnings (the orphaned previous task)
+- `readexactly() called while another coroutine is already waiting for incoming
+  data, shutting down FcmPushClient` (two `_listen()` tasks racing on the same
+  socket reader)
+- Whichever device's request was in flight when that happened would time out with
+  no location, even though the request itself was otherwise fine
+
+**Fix**: add `self._listening = True` right after `await
+self._register_for_fcm_and_listen()` in both `register_for_location_updates()` and
+`get_android_id()`, in `rest-api/patch_fcm_receiver.py`. Verified afterward: a full
+background update cycle across 6 real devices now does exactly one MCS login, zero
+task/race warnings, and all 6 locations update successfully.
 

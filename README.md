@@ -24,7 +24,12 @@ A REST API service that exposes Google Find My Device functionality using the [G
 ### Core Endpoints
 
 - `GET /` - API information and available endpoints
-- `GET /health` - Health check endpoint
+- `GET /health` - Health check endpoint. Returns `200` with
+  `{"status":"healthy","message":"Service is running normally"}` when initialized
+  correctly, or `503` with `{"status":"unhealthy","message":"<specific reason>"}`
+  when it isn't (e.g. `secrets.json` missing/invalid) - the message names the actual
+  cause, not just "unhealthy". The container itself stays up either way, so this is
+  safe to check without risking a crash-loop.
 - `GET /api/v1/devices` - List all devices
 - `GET /api/v1/devices/{device_id}` - Get detailed information for a specific device
 
@@ -248,31 +253,34 @@ fetch("http://localhost:8000/api/v1/devices")
 ```json
 [
   {
-    "device_id": "abc123def456",
+    "device_id": "689a0735-0000-2f84-82f1-f403043a0b70",
     "name": "My Tracker",
-    "device_type": "TRACKER",
+    "device_type": "SPOT_DEVICE",
     "last_seen": "2024-01-15T10:30:00Z",
     "status": "ACTIVE"
   },
   {
-    "device_id": "xyz789ghi012",
+    "device_id": "66664988-0000-2b56-9aee-14c14ef7a9f8",
     "name": "My Phone",
-    "device_type": "PHONE",
+    "device_type": "SPOT_DEVICE",
     "last_seen": "2024-01-15T11:00:00Z",
     "status": "ACTIVE"
   }
 ]
 ```
 
+`device_type` is currently always `SPOT_DEVICE` regardless of the actual underlying
+device (phone or tracker) - the API doesn't yet distinguish them.
+
 ### Device Detail Response
 
 ```json
 {
-  "device_id": "abc123def456",
+  "device_id": "689a0735-0000-2f84-82f1-f403043a0b70",
   "name": "My Tracker",
-  "device_type": "TRACKER",
-  "model": "Custom ESP32",
-  "battery_level": 85,
+  "device_type": "SPOT_DEVICE",
+  "model": "Fast Pair Model bbe0d0",
+  "battery_level": null,
   "location": {
     "latitude": 37.7749,
     "longitude": -122.4194,
@@ -284,6 +292,10 @@ fetch("http://localhost:8000/api/v1/devices")
   "additional_info": {}
 }
 ```
+
+`battery_level` is currently always `null`: Google's Find My Device network doesn't
+expose a battery percentage for `SPOT_DEVICE` trackers in the reverse-engineered
+protocol this project uses.
 
 ## Configuration
 
@@ -466,11 +478,17 @@ rest-api/
 │       └── device_service.py # Device service logic
 ├── patch_chrome_driver.py   # Patch for Chrome driver compatibility
 ├── patch_fcm_receiver.py    # Patch for FCM async compatibility
-├── Dockerfile
-├── docker-compose.yml
+├── Dockerfile                        # Also accepts an APP_VERSION build-arg (see RELEASING.md)
+├── docker-compose.yml                # Local dev: builds the image from source
+├── docker-compose.portainer.yml      # Production: pulls the published image
+├── RELEASING.md                      # How the Docker image gets published (GitHub Actions)
 ├── requirements.txt
 └── README.md
 ```
+
+Publishing the Docker image is handled entirely by
+[`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) -
+there's no local build/push script; see [RELEASING.md](RELEASING.md).
 
 ### Technical Implementation Details
 
@@ -498,6 +516,17 @@ The service uses FastAPI's lifespan events to manage a background asyncio task t
 This approach ensures location data is always fresh while minimizing API calls and network usage.
 
 ## Synology NAS Deployment
+
+Two ways to run this on a Synology NAS:
+
+- **Build it yourself with Container Manager's "Project" feature** - covered below
+  and in [SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md). Builds the image on the NAS itself
+  from this repo's `Dockerfile`.
+- **Pull a pre-built image via Portainer** - faster (no build on the NAS), works with
+  a private Docker Hub image published by CI. See [RELEASING.md](RELEASING.md) and
+  [`docker-compose.portainer.yml`](docker-compose.portainer.yml). Note: Synology's
+  own Container Manager "check for update" badge doesn't reliably track images
+  managed this way - see RELEASING.md for how to actually redeploy a new version.
 
 ### ⚠️ Important: Authentication Required First
 
