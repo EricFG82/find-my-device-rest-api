@@ -17,9 +17,20 @@ input("[AuthFlow] Press Enter to continue...")
 
 **This means the `secrets.json` authentication file is missing or not properly mounted.**
 
+> **This is no longer the only option.** You can now authenticate directly on
+> the NAS through a browser - no Mac/PC step needed at all. See
+> [AUTHENTICATION.md, Method 3](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed):
+> start the container with no `secrets.json`, call `POST /auth/vnc/start`,
+> and log in through the returned URL. The rest of this guide (Steps 1-2,
+> authenticating on your Mac/PC first) is still valid if you prefer it, but
+> it's no longer required.
+
 ## 📋 Prerequisites
 
-Before deploying to Synology NAS, you **MUST** authenticate on your Mac/PC first. The Docker container cannot perform interactive authentication.
+Before deploying to Synology NAS with **Method 1 or 2**, you must authenticate
+on your Mac/PC first, since those methods can't do an interactive login
+inside the container. **Method 3 (in-browser via VNC) doesn't have this
+requirement** - see the note above.
 
 ## 🔧 Step-by-Step Setup
 

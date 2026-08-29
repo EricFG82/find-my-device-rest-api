@@ -545,9 +545,13 @@ Two ways to run this on a Synology NAS:
   own Container Manager "check for update" badge doesn't reliably track images
   managed this way - see RELEASING.md for how to actually redeploy a new version.
 
-### ⚠️ Important: Authentication Required First
+### ⚠️ Important: Authentication
 
-**You MUST authenticate on your Mac/PC before deploying to Synology NAS.** The Docker container cannot perform interactive authentication.
+**If using Method 1 or 2, you must authenticate on your Mac/PC before deploying
+to Synology NAS** - those methods can't do an interactive login inside the
+container. **This isn't required with Method 3**: authenticate directly on
+the NAS through a browser instead - see
+[AUTHENTICATION.md, Method 3](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed).
 
 ### Quick Start
 
