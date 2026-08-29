@@ -669,7 +669,8 @@ Location data will not be automatically fetched, but the service will remain sta
 
 ## License
 
-This project uses the GoogleFindMyTools library which is licensed under GPL-3.0.
+GPL-3.0 - see the [root LICENSE](../LICENSE) for the full text and why (this
+service imports the GPL-3.0-licensed GoogleFindMyTools directly).
 
 ## Credits
 
