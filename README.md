@@ -60,7 +60,7 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
 ### Option 1: Docker Deployment (Recommended)
 
-1. **Clone this repository**:
+1. **Navigate to the REST API directory**:
 
    ```bash
    cd rest-api
@@ -610,55 +610,6 @@ The service now includes:
 - ✅ Automatic location updates working in all environments
 
 **Backward Compatibility**: The `ENABLE_LOCATION_UPDATES` environment variable is still available if you need to disable location updates for any reason, but it's no longer necessary for stability.
-
-## Configuration Options
-
-### Environment Variables
-
-You can configure the service using environment variables in `docker-compose.yml`:
-
-| Variable                  | Default | Description                                          |
-| ------------------------- | ------- | ---------------------------------------------------- |
-| `PYTHONUNBUFFERED`        | `1`     | Enable Python unbuffered output for better logging   |
-| `LOG_LEVEL`               | `INFO`  | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)  |
-| `ENABLE_LOCATION_UPDATES` | `true`  | Enable/disable automatic background location updates |
-
-### Location Updates
-
-The service includes automatic background location updates that fetch device locations every 5 minutes using FCM (Firebase Cloud Messaging).
-
-**Features:**
-
-- ✅ Automatic updates every 5 minutes
-- ✅ Cached location data for fast API responses
-- ✅ Real-time location accuracy with latitude, longitude, and accuracy
-- ✅ Works with all Google Find My Device trackers
-- ✅ **Now works in all Docker environments** (including Synology NAS)
-- ✅ Proper async/await implementation (no more event loop errors)
-
-**How it works:**
-
-1. Service starts and waits 30 seconds before first update
-2. Background task fetches location for each device sequentially
-3. Locations are cached for 5 minutes
-4. Updates repeat every 5 minutes automatically
-5. API responses use cached data for fast performance
-
-**Requirements:**
-
-- ⚠️ Requires stable network connection
-- ⚠️ First location update takes 30 seconds after service start
-- ⚠️ Each device location fetch takes ~2-3 seconds
-
-**Optional: Disable location updates**
-
-If you want to disable automatic location updates (e.g., to reduce network usage), set `ENABLE_LOCATION_UPDATES=false` in `docker-compose.yml`. The API will still work for:
-
-- Listing all devices
-- Getting device details (name, ID, type, status)
-- Device metadata (model, image URL, etc.)
-
-Location data will not be automatically fetched, but the service will remain stable.
 
 ## Security Considerations
 

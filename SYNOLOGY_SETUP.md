@@ -19,7 +19,7 @@ input("[AuthFlow] Press Enter to continue...")
 
 > **This is no longer the only option.** You can now authenticate directly on
 > the NAS through a browser - no Mac/PC step needed at all. See
-> [AUTHENTICATION.md, Method 3](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed):
+> [AUTHENTICATION.md, Method 3](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed):
 > start the container with no `secrets.json`, call `POST /auth/vnc/start`,
 > and log in through the returned URL. The rest of this guide (Steps 1-2,
 > authenticating on your Mac/PC first) is still valid if you prefer it, but
