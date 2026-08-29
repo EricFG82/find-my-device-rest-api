@@ -20,9 +20,17 @@ logger = logging.getLogger(__name__)
 class DeviceService:
     """Service for managing device operations"""
     
-    def __init__(self):
+    def __init__(self, vnc_auth_service=None):
         self.initialized = False
         self.init_error: Optional[str] = None
+        # Optional reference to the VncAuthService instance, used to avoid
+        # racing with it: an in-progress VNC session clears the cached
+        # aas_token (see vnc_auth_entrypoint.py) so it can force a real login,
+        # but any *other* concurrent auth attempt would see that same cleared
+        # token and try to open its own (headless, unattended, un-completable)
+        # OAuth flow - hanging for 5 minutes for nothing. Checking this first
+        # turns that into an immediate, clear error instead.
+        self._vnc_auth_service = vnc_auth_service
         self._devices_cache: Optional[List[Dict[str, Any]]] = None
         self._cache_timestamp: Optional[datetime] = None
 
@@ -119,6 +127,13 @@ class DeviceService:
     
     async def _fetch_devices_from_api(self) -> List[Dict[str, Any]]:
         """Fetch devices from GoogleFindMyTools API"""
+        if self._vnc_auth_service and self._vnc_auth_service.state == "running":
+            raise RuntimeError(
+                "A VNC authentication session is currently in progress (see GET "
+                "/auth/vnc/status) - not fetching devices until it finishes, to avoid "
+                "triggering a second, unattended login attempt that would just hang."
+            )
+
         try:
             # Run the blocking call in a thread pool
             loop = asyncio.get_event_loop()
@@ -306,6 +321,10 @@ class DeviceService:
 
         This runs in the background task and has access to the main event loop.
         """
+        if self._vnc_auth_service and self._vnc_auth_service.state == "running":
+            logger.debug(f"Skipping location fetch for {device_id}: VNC auth session in progress")
+            return None
+
         try:
             # Check location cache first (5 minute TTL for locations)
             now = datetime.now()

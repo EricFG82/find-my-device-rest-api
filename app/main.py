@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     
     # Startup
     logger.info("Starting GoogleFindMyTools REST API Service...")
-    device_service = DeviceService()
+    device_service = DeviceService(vnc_auth_service=vnc_auth_service)
     try:
         await device_service.initialize()
         logger.info("Device service initialized successfully")
@@ -177,6 +177,7 @@ async def health_check():
     "/api/v1/devices",
     response_model=List[Device],
     responses={
+        409: {"model": ErrorResponse, "description": "VNC authentication session in progress"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
         503: {"model": ErrorResponse, "description": "Service unavailable"}
     }
@@ -193,7 +194,12 @@ async def get_devices():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service not initialized"
         )
-    
+    if vnc_auth_service.state == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A VNC authentication session is currently in progress - see GET /auth/vnc/status"
+        )
+
     try:
         devices = await device_service.get_all_devices()
         return devices
@@ -210,6 +216,7 @@ async def get_devices():
     response_model=DeviceDetail,
     responses={
         404: {"model": ErrorResponse, "description": "Device not found"},
+        409: {"model": ErrorResponse, "description": "VNC authentication session in progress"},
         500: {"model": ErrorResponse, "description": "Internal server error"},
         503: {"model": ErrorResponse, "description": "Service unavailable"}
     }
@@ -235,7 +242,12 @@ async def get_device_detail(device_id: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service not initialized"
         )
-    
+    if vnc_auth_service.state == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A VNC authentication session is currently in progress - see GET /auth/vnc/status"
+        )
+
     try:
         device_detail = await device_service.get_device_detail(device_id)
         
