@@ -1,8 +1,6 @@
 # Google Find My Device REST API Service
 
-A REST API service that exposes Google Find My Device functionality using the [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools) library. Standalone - usable with anything that can make HTTP calls, not just Home Assistant.
-
-> Looking for the Home Assistant custom integration? See [ha_google_find](https://github.com/EricFG82/ha_google_find) - it talks to this API over HTTP.
+A REST API service that exposes Google Find My Device functionality using the [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools) library. Standalone - usable with anything that can make HTTP calls.
 
 > Deploying a pre-built image via Portainer, or cutting a new release? See [RELEASING.md](RELEASING.md).
 
@@ -339,6 +337,41 @@ expose a battery percentage for `SPOT_DEVICE` trackers in the reverse-engineered
 protocol this project uses.
 
 ## Configuration
+
+`docker-compose.yml` already ships with sensible defaults. Simplified (the
+real file also adds a healthcheck and a dedicated network), here's the gist
+of it and the environment variables you can tune:
+
+```yaml
+services:
+  google-findmy-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Or, to pull the pre-built private image instead of building locally:
+    # image: ericfg82/google-findmy-api:v1.2.0
+    container_name: google-findmy-api
+    ports:
+      - "8000:8000" # REST API
+      - "6080:6080" # noVNC web UI (in-browser auth - only serves anything mid-login)
+    volumes:
+      - ./auth_data/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json
+    environment:
+      - LOG_LEVEL=INFO # DEBUG, INFO, WARNING, or ERROR
+
+      # Cache TTL for the device list, in seconds
+      - DEVICE_CACHE_TTL=60
+
+      # How often locations are refreshed in the background, in seconds
+      - LOCATION_UPDATE_INTERVAL=300
+
+      # Set to 'false' to disable automatic background location updates
+      - ENABLE_LOCATION_UPDATES=true
+    restart: unless-stopped
+```
+
+See [`docker-compose.portainer.yml`](docker-compose.portainer.yml) for the
+equivalent setup that pulls the published image instead of building it.
 
 ### Environment Variables
 

@@ -511,8 +511,6 @@ After successful authentication:
    open http://localhost:8000/docs
    ```
 
-5. **Using this with Home Assistant?** See [google-findmy on ha_google_find](https://github.com/EricFG82/ha_google_find) for the custom integration.
-
 ---
 
 ## Getting Help

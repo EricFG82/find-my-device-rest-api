@@ -2,12 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-> This repo was split out of [ha_google_find](https://github.com/EricFG82/ha_google_find)
-> (which now holds only the Home Assistant integration) so this REST API could
-> be versioned/released independently. Entries below predate the split and are
-> kept as-is for history - some also mention `homeassistant-integration`
-> changes that happened in the same commits back when both lived together.
-
 ## [1.2.0] - 2026-08-29
 
 ### Added
@@ -91,11 +85,6 @@ All notable changes to this project will be documented in this file.
 - **docker-compose.portainer.yml**: New compose file for Portainer deployments
   that pulls the published image (`image:`) instead of building from source, with
   `secrets.json` mounted from the NAS filesystem rather than baked into the image.
-
-*(This commit range also included `homeassistant-integration` fixes for dynamic
-entity creation and stale-device cleanup - see
-[ha_google_find's CHANGELOG.md](https://github.com/EricFG82/ha_google_find/blob/main/CHANGELOG.md)
-for those.)*
 
 ## [1.0.2] - 2025-10-30
 
