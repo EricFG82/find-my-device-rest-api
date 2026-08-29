@@ -349,7 +349,7 @@ services:
       context: .
       dockerfile: Dockerfile
     # Or, to pull the pre-built private image instead of building locally:
-    # image: ericfg82/google-findmy-api:v1.2.0
+    # image: ericfg82/google-find-my-device-rest-api:v1.2.0
     container_name: google-findmy-api
     ports:
       - "8000:8000" # REST API

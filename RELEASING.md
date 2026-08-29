@@ -1,7 +1,7 @@
 # Releasing the REST API Docker image
 
 The REST API is published as a **private** Docker Hub image:
-`docker.io/ericfg82/google-findmy-api`. This document covers how to cut a
+`docker.io/ericfg82/google-find-my-device-rest-api`. This document covers how to cut a
 new version and get it running on the NAS.
 
 **GitHub Actions is the only way this image gets published** - there is no local
@@ -57,7 +57,7 @@ git push origin main --tags
 ```
 
 Pushing the tag triggers [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml),
-which builds the image from this repo and pushes both `ericfg82/google-findmy-api:vX.Y.Z`
+which builds the image from this repo and pushes both `ericfg82/google-find-my-device-rest-api:vX.Y.Z`
 and `:latest`. Watch it under the repo's **Actions** tab.
 
 To publish `:latest` without cutting a tagged version (e.g. to smoke-test a change
