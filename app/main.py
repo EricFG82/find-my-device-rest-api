@@ -123,6 +123,9 @@ async def root():
             "health": "/health",
             "devices": "/api/v1/devices",
             "device_detail": "/api/v1/devices/{device_id}",
+            "vnc_auth_start": "/auth/vnc/start",
+            "vnc_auth_status": "/auth/vnc/status",
+            "vnc_auth_stop": "/auth/vnc/stop",
             "docs": "/docs",
             "redoc": "/redoc"
         }

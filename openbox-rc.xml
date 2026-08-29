@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimal Openbox config for the in-browser (VNC) auth flow: Chrome is the
+  only window that will ever appear on this display, so force it maximized
+  and undecorated (no title bar/borders) to fill the whole noVNC view.
+  See rest-api/app/services/vnc_auth_service.py.
+-->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <applications>
+    <application class="*">
+      <maximized>yes</maximized>
+      <decor>no</decor>
+      <focus>yes</focus>
+    </application>
+  </applications>
+</openbox_config>

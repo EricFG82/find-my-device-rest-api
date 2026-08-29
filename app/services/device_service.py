@@ -68,7 +68,8 @@ class DeviceService:
                     # missing, empty, or has no cached username - treat that as a failure.
                     raise RuntimeError(
                         "secrets.json is missing, empty, or invalid (no authenticated "
-                        "username found). Check the volume/file mount for secrets.json."
+                        "username found). Start an in-browser login at POST /auth/vnc/start "
+                        "(see AUTHENTICATION.md), or check the volume/file mount for secrets.json."
                     )
                 logger.info(f"Authentication verified for user: {username}")
             except Exception as auth_error:
@@ -127,7 +128,19 @@ class DeviceService:
             from ProtoDecoders.decoder import parse_device_list_protobuf, get_canonic_ids
 
             # Execute in thread pool to avoid blocking
-            result_hex = await loop.run_in_executor(None, request_device_list)
+            try:
+                result_hex = await loop.run_in_executor(None, request_device_list)
+            except KeyError as e:
+                # token_retrieval.py does auth_response['Auth'] (or similar) without
+                # checking it's present. Google returns a response with no 'Auth' key
+                # when it rejects the request outright (e.g. HTTP 403), which happens
+                # right after a token gets revoked/expires - so this surfaces as a
+                # bare "KeyError: 'Auth'" instead of a message pointing at the cause.
+                raise RuntimeError(
+                    f"Google rejected the authentication token (missing {e} key in its "
+                    "response - usually means the token was revoked or expired). "
+                    "Try re-authenticating (see AUTHENTICATION.md)."
+                ) from e
 
             if not result_hex:
                 # nova_request() returns None (instead of raising) when Google's Nova API
@@ -340,7 +353,17 @@ class DeviceService:
 
             # Create and send location request
             hex_payload = create_location_request(device_id, fcm_token, request_uuid)
-            nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
+            try:
+                nova_request(NOVA_ACTION_API_SCOPE, hex_payload)
+            except KeyError as e:
+                # See the matching guard in _fetch_devices_from_api - same underlying
+                # cause (Google rejected the token, response has no 'Auth' key).
+                logger.warning(
+                    f"Google rejected the authentication token while fetching location "
+                    f"for device {device_id} (missing {e} key - token likely revoked or "
+                    "expired). Try re-authenticating."
+                )
+                return None
 
             # Wait for response (with timeout)
             timeout = 30  # 30 seconds timeout

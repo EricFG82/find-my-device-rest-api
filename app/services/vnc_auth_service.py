@@ -96,7 +96,7 @@ class VncAuthService:
         await self._wait_for_x_display()
 
         openbox = await asyncio.create_subprocess_exec(
-            "openbox",
+            "openbox", "--config-file", "/app/openbox-rc.xml",
             env=env,
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
             start_new_session=True,

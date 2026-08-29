@@ -25,6 +25,15 @@ RUN apt-get update && apt-get install -y \
     tini \
     && rm -rf /var/lib/apt/lists/*
 
+# noVNC serves a directory listing at / since it has no index.html of its own -
+# mirror vnc.html as index.html so visiting the bare port shows the connect
+# page instead of a file listing.
+RUN cp /usr/share/novnc/vnc.html /usr/share/novnc/index.html
+
+# Openbox config for the VNC auth flow: maximizes and un-decorates the Chrome
+# window so it fills the whole noVNC view. See vnc_auth_service.py.
+COPY openbox-rc.xml /app/openbox-rc.xml
+
 # Clone GoogleFindMyTools repository
 RUN git clone https://github.com/leonboe1/GoogleFindMyTools.git /app/GoogleFindMyTools
 
