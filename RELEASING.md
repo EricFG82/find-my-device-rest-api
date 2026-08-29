@@ -4,6 +4,11 @@ The REST API is published as a **private** Docker Hub image:
 `docker.io/ericfg82/google-findmy-api`. This document covers how to cut a
 new version and get it running on the NAS.
 
+**GitHub Actions is the only way this image gets published** - there is no local
+build/push script. This guarantees every published image (including `:latest`)
+traces back to a real commit in the repo, not to whatever happened to be on
+someone's laptop at the time.
+
 ## Overview
 
 ```
@@ -14,28 +19,31 @@ git tag vX.Y.Z  ──push──>  GitHub Action  ──build & push──>  Doc
                                                               NAS (Synology)
 ```
 
-- `secrets.json` is **never** baked into the image, on either path (local script or
-  CI) - it's git-ignored, so it doesn't exist in a CI checkout at all, and the local
-  script temporarily moves it out of the build context before building. The running
-  container always gets it via a volume/file mount instead - see
+- `secrets.json` is **never** in the image: it's git-ignored, so it simply doesn't
+  exist in the CI checkout the workflow builds from. The running container always
+  gets it via a volume/file mount instead - see
   [`docker-compose.portainer.yml`](docker-compose.portainer.yml) and
   [`AUTHENTICATION.md`](../AUTHENTICATION.md).
-- Builds disable buildx's provenance/SBOM attestations (`--provenance=false
-  --sbom=false`). Without this, buildx wraps the image in an OCI index with an
-  extra "attestation manifest" that Synology's Container Manager fails to parse
-  when checking for updates - it silently never shows "update available".
+- The build disables buildx's provenance/SBOM attestations (`provenance: false`,
+  `sbom: false` in the workflow). Without this, buildx wraps the image in an OCI
+  index with an extra "attestation manifest" that Synology's Container Manager
+  fails to parse when checking for updates - it silently never shows "update
+  available".
+- The image's reported version (`/` and `/docs`) comes from the `APP_VERSION`
+  build-arg the workflow passes in (derived from the git tag), not a hardcoded
+  string - see the `Determine image tags and app version` step in the workflow.
 
-## Option A: Automatic (GitHub Actions)
+## One-time setup
 
-**One-time setup** (already done as of `v1.1.0`, skip if it's still configured):
+Already done as of `v1.1.0` - listed here in case it ever needs redoing (e.g. the
+token expires).
 
-1. In GitHub → repo → **Settings → Secrets and variables → Actions**, add:
-   - `DOCKERHUB_USERNAME` = `ericfg82`
-   - `DOCKERHUB_TOKEN` = a Docker Hub **Access Token** (Docker Hub → Account
-     Settings → Security → New Access Token). Use a dedicated token for CI,
-     with Read & Write scope, separate from the one used for local `docker login`.
+In GitHub → repo → **Settings → Secrets and variables → Actions**, add:
+- `DOCKERHUB_USERNAME` = `ericfg82`
+- `DOCKERHUB_TOKEN` = a Docker Hub **Access Token** (Docker Hub → Account
+  Settings → Security → New Access Token), Read & Write scope.
 
-**Cutting a release:**
+## Cutting a release
 
 ```bash
 # 1. Add an entry to CHANGELOG.md describing what changed.
@@ -50,30 +58,16 @@ git push origin main --tags
 
 Pushing the tag triggers [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml),
 which builds the image from `rest-api/` and pushes both `ericfg82/google-findmy-api:vX.Y.Z`
-and `:latest`. Watch it under the repo's **Actions** tab. It can also be triggered
-manually from there (`workflow_dispatch`) without pushing a tag - that only
-publishes `:latest`.
+and `:latest`. Watch it under the repo's **Actions** tab.
 
-## Option B: Manual (local)
-
-Useful while iterating on a fix, before you're ready to cut a versioned release.
-
-```bash
-cd rest-api
-docker login -u ericfg82           # once per machine/session
-./build-and-push.sh                # no tag arg + HEAD has no git tag -> publishes :latest only
-./build-and-push.sh                # no tag arg + HEAD IS tagged (e.g. v1.1.0) -> publishes :v1.1.0 and :latest
-./build-and-push.sh v1.2.3         # explicit tag -> publishes :v1.2.3 and :latest, regardless of git tags
-```
-
-The script builds for `linux/amd64` by default (matches the NAS). Override with
-`PLATFORMS=linux/amd64,linux/arm64 ./build-and-push.sh` if you ever need to also
-target an ARM NAS.
+To publish `:latest` without cutting a tagged version (e.g. to smoke-test a change
+on the NAS before committing to a version number), trigger the workflow manually
+from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 
 ## Deploying a new version to the NAS
 
 `rest-api/docker-compose.portainer.yml` pins a specific version tag (currently
-`v1.1.0`) rather than `:latest`, so redeploys are deliberate:
+`v1.1.1`) rather than `:latest`, so redeploys are deliberate:
 
 1. Bump the `image:` tag in `docker-compose.portainer.yml` to the new version and
    commit it.
