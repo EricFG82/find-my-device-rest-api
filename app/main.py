@@ -3,15 +3,23 @@ GoogleFindMyTools REST API Service
 A REST API service that exposes Google Find My Device functionality
 """
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from typing import List, Optional
 
-from app.models import Device, DeviceDetail, ErrorResponse, HealthResponse
+from app.models import (
+    Device,
+    DeviceDetail,
+    ErrorResponse,
+    HealthResponse,
+    VncAuthStartResponse,
+    VncAuthStatusResponse,
+)
 from app.services.device_service import DeviceService
+from app.services.vnc_auth_service import VncAuthService
 
 # Configure logging
 import os
@@ -28,6 +36,34 @@ APP_VERSION = os.getenv("APP_VERSION", "0.0.0-dev")
 
 # Global device service instance
 device_service: Optional[DeviceService] = None
+
+
+async def _reinitialize_device_service_after_vnc_auth():
+    """Called once a VNC auth session succeeds, so the already-running app
+    picks up the new secrets.json without needing a manual restart.
+
+    Only actually re-initializes if device_service didn't already have working
+    auth (e.g. the container started with no secrets.json at all) - if it was
+    already initialized, re-running initialize() would start a second
+    background location updater on top of the running one, reintroducing the
+    exact FCM/MCS reconnect-storm bug fixed in v1.1.0.
+    """
+    global device_service
+    if device_service is None or device_service.initialized:
+        return
+
+    logger.info("VNC authentication succeeded - re-initializing device service...")
+    try:
+        await device_service.initialize()
+        logger.info("Device service re-initialized successfully after VNC authentication")
+    except Exception as e:
+        logger.error(f"Failed to re-initialize device service after VNC authentication: {e}")
+
+
+# VNC auth service doesn't need async initialization, so it can be created
+# eagerly - unlike device_service, there's no external dependency to verify
+# at startup (the whole point is that it can run even without secrets.json).
+vnc_auth_service = VncAuthService(on_success=_reinitialize_device_service_after_vnc_auth)
 
 
 @asynccontextmanager
@@ -53,6 +89,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down GoogleFindMyTools REST API Service...")
     if device_service:
         await device_service.cleanup()
+    await vnc_auth_service.stop()
 
 
 # Create FastAPI app
@@ -214,6 +251,56 @@ async def get_device_detail(device_id: str):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch device detail: {str(e)}"
         )
+
+
+@app.post(
+    "/auth/vnc/start",
+    response_model=VncAuthStartResponse,
+    responses={409: {"model": ErrorResponse, "description": "A session is already running"}}
+)
+async def start_vnc_auth(request: Request):
+    """
+    Start an in-browser (VNC) authentication session.
+
+    Spins up a virtual display and a real (non-headless) Chrome window, then
+    triggers Google's OAuth login flow against it. Open the returned
+    `vnc_url` in a browser to see and interact with that Chrome window
+    (CAPTCHA/2FA included) and complete the login. See AUTHENTICATION.md.
+    """
+    try:
+        result = await vnc_auth_service.start()
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to start VNC auth session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start VNC auth session: {str(e)}"
+        )
+
+    host = request.url.hostname or "localhost"
+    vnc_url = f"http://{host}:{result['novnc_port']}/vnc.html?autoconnect=true&password={result['password']}"
+
+    return VncAuthStartResponse(
+        vnc_url=vnc_url,
+        password=result["password"],
+        novnc_port=result["novnc_port"],
+        expires_in_seconds=result["expires_in_seconds"],
+    )
+
+
+@app.get("/auth/vnc/status", response_model=VncAuthStatusResponse)
+async def vnc_auth_status():
+    """Current state of the VNC authentication session (idle/running/succeeded/failed)."""
+    result = await vnc_auth_service.status()
+    return VncAuthStatusResponse(**result)
+
+
+@app.post("/auth/vnc/stop")
+async def stop_vnc_auth():
+    """Tear down the VNC authentication session, if one is running."""
+    await vnc_auth_service.stop()
+    return {"status": "stopped"}
 
 
 @app.exception_handler(Exception)

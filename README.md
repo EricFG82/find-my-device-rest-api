@@ -32,6 +32,9 @@ A REST API service that exposes Google Find My Device functionality using the [G
   safe to check without risking a crash-loop.
 - `GET /api/v1/devices` - List all devices
 - `GET /api/v1/devices/{device_id}` - Get detailed information for a specific device
+- `POST /auth/vnc/start` / `GET /auth/vnc/status` / `POST /auth/vnc/stop` -
+  In-browser authentication (no local Chrome needed) via noVNC - see
+  [AUTHENTICATION.md](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
 
 ### Documentation
 
@@ -120,9 +123,23 @@ A REST API service that exposes Google Find My Device functionality using the [G
    docker compose run --rm -w /app/GoogleFindMyTools google-findmy-api python main.py
    ```
 
-   **Note**: This method uses headless Chrome inside Docker, which may have limitations with certain authentication flows (e.g., CAPTCHA, advanced 2FA). If you encounter issues, use Method 1 instead.
+   **Note**: This method uses headless Chrome inside Docker, which may have limitations with certain authentication flows (e.g., CAPTCHA, advanced 2FA). If you encounter issues, use Method 1 or Method 3 instead.
 
    The authentication data will be saved in `./auth_data/secrets.json`.
+
+   #### Method 3: Authenticate via Browser (VNC) - No Local Chrome Needed
+
+   Full CAPTCHA/2FA support like Method 1, but entirely through the container -
+   nothing to install locally, nothing to copy over. See
+   [AUTHENTICATION.md](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
+   for the full walkthrough; the short version:
+
+   ```bash
+   docker compose up -d
+   curl -X POST http://localhost:8000/auth/vnc/start   # returns a vnc_url + password
+   # open vnc_url in a browser, log in, then:
+   curl http://localhost:8000/auth/vnc/status           # watch for "succeeded" - no restart needed
+   ```
 
 4. **Start the service**:
 

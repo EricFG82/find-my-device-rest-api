@@ -6,6 +6,10 @@ services:
     container_name: google-findmy-api
     ports:
       - "8000:8000"
+      # noVNC web UI for the in-browser (VNC) authentication flow - see
+      # AUTHENTICATION.md ("Method 3"). Only serves anything while a session
+      # started via POST /auth/vnc/start is active.
+      - "6080:6080"
     volumes:
       # Mount only the secrets.json file (not the entire Auth directory to preserve Python modules)
       - ./auth_data/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json

@@ -58,111 +58,104 @@ def patch_chrome_driver():
     else:
         print("[Patch] Warning: Could not find expected paths to patch.")
 
-    # Patch 2: Add headless and Docker-friendly options
+    # Patch 2: Add Docker-friendly options
+    #
+    # Deliberately NOT forcing --headless here: the in-browser VNC auth flow
+    # (vnc_auth_entrypoint.py) needs a real, visible Chrome window on the
+    # virtual display (DISPLAY=:99) so it can be seen/clicked through noVNC.
+    # create_driver() below already falls back to --headless on its own if
+    # no display is available (e.g. no DISPLAY set, or Xvfb isn't running),
+    # so headless-by-necessity is still covered without hardcoding it here.
     old_options = '''def get_options():
     chrome_options = uc.ChromeOptions()
     chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
-
+    chrome_options.add_argument("--disable-dev-shm-usage")
     return chrome_options'''
 
     new_options = '''def get_options():
     chrome_options = uc.ChromeOptions()
     # Docker-friendly options
-    chrome_options.add_argument("--headless=new")  # New headless mode
+    chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-setuid-sandbox")
-    chrome_options.add_argument("--remote-debugging-port=9222")
-    chrome_options.add_argument("--window-size=1920,1080")
-
+    chrome_options.add_argument("--window-size=1280,800")
     return chrome_options'''
 
     if old_options in content:
         content = content.replace(old_options, new_options)
-        print("[Patch] Added headless and Docker-friendly options.")
+        print("[Patch] Added Docker-friendly options.")
     else:
         print("[Patch] Warning: Could not find expected options to patch.")
 
-    # Patch 3: Specify ChromeDriver path explicitly
-    old_create_driver = '''def create_driver():
-    """Create a Chrome WebDriver with undetected_chromedriver."""
-
-    try:
-        chrome_options = get_options()
-        driver = uc.Chrome(options=chrome_options)
-        print("[ChromeDriver] Installed and browser started.")
-        return driver
-    except Exception:
-        print("[ChromeDriver] Default ChromeDriver creation failed. Trying alternative paths...")
-
-        chrome_path = find_chrome()
-        if chrome_path:
-            chrome_options = get_options()
-            chrome_options.binary_location = chrome_path
-            try:
-                driver = uc.Chrome(options=chrome_options)
-                print(f"[ChromeDriver] ChromeDriver started using {chrome_path}")
-                return driver
-            except Exception as e:
-                print(f"[ChromeDriver] ChromeDriver failed using path {chrome_path}: {e}")
-        else:
-            print("[ChromeDriver] No Chrome executable found in known paths.")
-
-        raise Exception(
-            "[ChromeDriver] Failed to install ChromeDriver. A current version of Chrome was not detected on your system.\\n"
-            "If you know that Chrome is installed, update Chrome to the latest version. If the script is still not working, "
-            "set the path to your Chrome executable manually inside the script."
-        )'''
-
-    new_create_driver = '''def create_driver():
-    """Create a Chrome WebDriver with undetected_chromedriver."""
-
-    try:
-        chrome_options = get_options()
-        # Explicitly specify ChromeDriver and Chrome paths for Docker
-        driver = uc.Chrome(
+    # Patch 3: Specify ChromeDriver/Chromium paths explicitly, instead of letting
+    # undetected_chromedriver auto-detect/download a matching driver (slower,
+    # depends on network access to a version-lookup endpoint). We already have
+    # matching chromium + chromium-driver installed via apt at fixed versions.
+    #
+    # Three small, independently-anchored replacements instead of one big
+    # whole-function match: create_driver() has three near-identical
+    # `uc.Chrome(...)` call sites, and matching the entire function verbatim
+    # is brittle against incidental upstream whitespace changes (it broke
+    # once already). Each site below is anchored on its unique neighboring
+    # line instead.
+    create_driver_patches = [
+        (
+            # `pkill -f chrome` (a "kill any pre-existing Chrome first" precaution)
+            # was found to hang indefinitely in some container environments -
+            # reproduced directly at the shell, unrelated to "chrome" matching
+            # anything. A fresh on-demand Xvfb session (the VNC auth flow) never
+            # has a pre-existing Chrome to kill anyway, so this is dead weight
+            # that can only hang create_driver() forever - skip it.
+            '''                os.system("pkill -f chrome")''',
+            '''                pass  # os.system("pkill -f chrome") removed: hangs in some environments, unneeded for a fresh Xvfb session''',
+        ),
+        (
+            # Primary attempt (8-space indent)
+            '''        driver = uc.Chrome(options=chrome_options, version_main=None)
+        print("[ChromeDriver] Installed and browser started.")''',
+            '''        driver = uc.Chrome(
             options=chrome_options,
             driver_executable_path="/usr/bin/chromedriver",
             browser_executable_path="/usr/bin/chromium"
         )
-        print("[ChromeDriver] Installed and browser started.")
-        return driver
-    except Exception as e:
-        print(f"[ChromeDriver] Default ChromeDriver creation failed: {e}")
-        print("[ChromeDriver] Trying alternative paths...")
-
-        chrome_path = find_chrome()
-        if chrome_path:
-            chrome_options = get_options()
-            chrome_options.binary_location = chrome_path
-            try:
-                driver = uc.Chrome(
+        print("[ChromeDriver] Installed and browser started.")''',
+        ),
+        (
+            # find_chrome() fallback (16-space indent)
+            '''                driver = uc.Chrome(options=chrome_options, version_main=None)
+                print(f"[ChromeDriver] ChromeDriver started using {chrome_path}")''',
+            '''                driver = uc.Chrome(
                     options=chrome_options,
                     driver_executable_path="/usr/bin/chromedriver"
                 )
-                print(f"[ChromeDriver] ChromeDriver started using {chrome_path}")
-                return driver
-            except Exception as e:
-                print(f"[ChromeDriver] ChromeDriver failed using path {chrome_path}: {e}")
-        else:
-            print("[ChromeDriver] No Chrome executable found in known paths.")
+                print(f"[ChromeDriver] ChromeDriver started using {chrome_path}")''',
+        ),
+        (
+            # Last-resort headless fallback (12-space indent)
+            '''            chrome_options.add_argument("--headless")
+            driver = uc.Chrome(options=chrome_options, version_main=None)''',
+            '''            chrome_options.add_argument("--headless=new")
+            driver = uc.Chrome(
+                options=chrome_options,
+                driver_executable_path="/usr/bin/chromedriver",
+                browser_executable_path="/usr/bin/chromium"
+            )''',
+        ),
+    ]
 
-        raise Exception(
-            "[ChromeDriver] Failed to install ChromeDriver. A current version of Chrome was not detected on your system.\\n"
-            "If you know that Chrome is installed, update Chrome to the latest version. If the script is still not working, "
-            "set the path to your Chrome executable manually inside the script."
-        )'''
+    create_driver_patched = 0
+    for old_snippet, new_snippet in create_driver_patches:
+        if old_snippet in content:
+            content = content.replace(old_snippet, new_snippet)
+            create_driver_patched += 1
 
-    if old_create_driver in content:
-        content = content.replace(old_create_driver, new_create_driver)
-        print("[Patch] Added explicit ChromeDriver path.")
+    if create_driver_patched == len(create_driver_patches):
+        print("[Patch] Added explicit ChromeDriver/Chromium paths to create_driver().")
     else:
-        print("[Patch] Warning: Could not find expected create_driver function to patch.")
+        print(f"[Patch] Warning: Only patched {create_driver_patched}/{len(create_driver_patches)} "
+              "create_driver() call sites - upstream may have changed further.")
 
     # Write the patched content
     with open(CHROME_DRIVER_PATH, 'w') as f:
