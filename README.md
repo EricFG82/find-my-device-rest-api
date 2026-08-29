@@ -6,6 +6,23 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
 > Deploying a pre-built image via Portainer, or cutting a new release? See [RELEASING.md](RELEASING.md).
 
+## Table of Contents
+
+- [Features](#features)
+- [API Endpoints](#api-endpoints)
+- [Prerequisites](#prerequisites)
+- [Setup and Installation](#setup-and-installation)
+- [Usage Examples](#usage-examples)
+- [Response Examples](#response-examples)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Synology NAS Deployment](#synology-nas-deployment)
+- [Security Considerations](#security-considerations)
+- [Disclaimer](#disclaimer)
+- [License](#license)
+- [Credits](#credits)
+
 ## Features
 
 - **List all devices**: Get a list of all devices registered in Google Find My Device with last seen timestamps
@@ -23,25 +40,24 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
 ## API Endpoints
 
-### Core Endpoints
+| Endpoint                      | Method | Description                    |
+| ------------------------------ | ------ | ------------------------------ |
+| `/`                            | GET    | API information and available endpoints |
+| `/health`                      | GET    | Health check                   |
+| `/api/v1/devices`              | GET    | List all devices               |
+| `/api/v1/devices/{device_id}`  | GET    | Get device details             |
+| `/auth/vnc/start`              | POST   | Start an in-browser (VNC) login session - see [AUTHENTICATION.md](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed) |
+| `/auth/vnc/status`             | GET    | Check the VNC login session's progress |
+| `/auth/vnc/stop`               | POST   | Tear down the VNC login session |
+| `/docs`                        | GET    | Interactive API docs (Swagger) |
+| `/redoc`                       | GET    | Alternative API docs (ReDoc)   |
 
-- `GET /` - API information and available endpoints
-- `GET /health` - Health check endpoint. Returns `200` with
-  `{"status":"healthy","message":"Service is running normally"}` when initialized
-  correctly, or `503` with `{"status":"unhealthy","message":"<specific reason>"}`
-  when it isn't (e.g. `secrets.json` missing/invalid) - the message names the actual
-  cause, not just "unhealthy". The container itself stays up either way, so this is
-  safe to check without risking a crash-loop.
-- `GET /api/v1/devices` - List all devices
-- `GET /api/v1/devices/{device_id}` - Get detailed information for a specific device
-- `POST /auth/vnc/start` / `GET /auth/vnc/status` / `POST /auth/vnc/stop` -
-  In-browser authentication (no local Chrome needed) via noVNC - see
-  [AUTHENTICATION.md](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
-
-### Documentation
-
-- `GET /docs` - Interactive API documentation (Swagger UI)
-- `GET /redoc` - Alternative API documentation (ReDoc)
+`/health` returns `200` with
+`{"status":"healthy","message":"Service is running normally"}` when initialized
+correctly, or `503` with `{"status":"unhealthy","message":"<specific reason>"}`
+when it isn't (e.g. `secrets.json` missing/invalid) - the message names the actual
+cause, not just "unhealthy". The container itself stays up either way, so this is
+safe to check without risking a crash-loop.
 
 ## Prerequisites
 
@@ -134,6 +150,11 @@ A REST API service that exposes Google Find My Device functionality using the [G
    curl http://localhost:8000/auth/vnc/status           # watch for "succeeded" - no restart needed
    ```
 
+   Opening `vnc_url` drops you straight into a live view of the Chrome window
+   running inside the container, already on Google's login page:
+
+   ![Google sign-in shown inside the noVNC browser view](docs/images/vnc-auth-login.png)
+
 3. **Start the service**:
 
    ```bash
@@ -151,6 +172,11 @@ A REST API service that exposes Google Find My Device functionality using the [G
    - API: http://localhost:8000
    - Interactive docs: http://localhost:8000/docs
    - Health check: http://localhost:8000/health
+
+   Every endpoint (including `/auth/vnc/start` and the others above) is
+   documented in the Swagger UI at `/docs`:
+
+   ![The /auth/vnc/start endpoint expanded in the Swagger UI at /docs](docs/images/vnc-auth-api-docs.png)
 
 ### Option 2: Local Development
 
