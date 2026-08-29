@@ -22,6 +22,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set via --build-arg APP_VERSION at image build time (see rest-api/RELEASING.md);
+# defaults to "0.0.0-dev" for local, non-image runs (e.g. uvicorn --reload).
+APP_VERSION = os.getenv("APP_VERSION", "0.0.0-dev")
+
 # Global device service instance
 device_service: Optional[DeviceService] = None
 
@@ -55,7 +59,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GoogleFindMyTools REST API",
     description="REST API service for Google Find My Device functionality",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -76,7 +80,7 @@ async def root():
     """Root endpoint with API information"""
     return {
         "name": "GoogleFindMyTools REST API",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "description": "REST API service for Google Find My Device functionality",
         "endpoints": {
             "health": "/health",

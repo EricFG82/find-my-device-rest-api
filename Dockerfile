@@ -60,6 +60,12 @@ ENV DEVICE_CACHE_TTL=60
 ENV LOCATION_UPDATE_INTERVAL=300
 ENV ENABLE_LOCATION_UPDATES=true
 
+# App version reported by / and in the OpenAPI docs. Set via --build-arg from the
+# git tag being published (see build-and-push.sh / .github/workflows/docker-publish.yml)
+# so it can't drift out of sync with the image tag like a hardcoded string would.
+ARG APP_VERSION=0.0.0-dev
+ENV APP_VERSION=${APP_VERSION}
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1

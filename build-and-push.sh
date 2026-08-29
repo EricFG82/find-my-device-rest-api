@@ -56,7 +56,9 @@ if [ -f "$SECRETS_FILE" ]; then
     echo "secrets.json set aside for this build - it will NOT be included in the pushed image."
 fi
 
-echo "Building and pushing ${FULL_IMAGE}:${TAG} (${PLATFORMS})..."
+APP_VERSION="${TAG#v}"
+
+echo "Building and pushing ${FULL_IMAGE}:${TAG} (${PLATFORMS}, APP_VERSION=${APP_VERSION})..."
 
 BUILD_TAGS=(-t "${FULL_IMAGE}:${TAG}")
 if [ "$TAG" != "latest" ]; then
@@ -67,6 +69,7 @@ docker buildx build \
     --platform "$PLATFORMS" \
     --provenance=false \
     --sbom=false \
+    --build-arg "APP_VERSION=${APP_VERSION}" \
     "${BUILD_TAGS[@]}" \
     --push \
     .
