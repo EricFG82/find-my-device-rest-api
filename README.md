@@ -17,7 +17,6 @@ A REST API service that exposes Google Find My Device functionality using the [G
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
-- [Synology NAS Deployment](#synology-nas-deployment)
 - [Security Considerations](#security-considerations)
 - [Disclaimer](#disclaimer)
 - [License](#license)
@@ -36,7 +35,7 @@ A REST API service that exposes Google Find My Device functionality using the [G
 - **Health checks**: Built-in health check endpoint for monitoring
 - **Intelligent caching**: 60-second cache for device list, 5-minute cache for locations
 - **Docker support**: Easy deployment with Docker and docker-compose
-- **Synology NAS compatible**: Works on Synology NAS with Container Manager
+- **Synology NAS compatible**: Runs like any other Docker host via Docker Compose
 
 ## API Endpoints
 
@@ -75,6 +74,13 @@ safe to check without risking a crash-loop.
 - Google Account with Find My Device enabled
 
 ## Setup and Installation
+
+> **On a Synology NAS?** This runs like any other Docker host - no NAS-specific
+> steps needed. Either deploy [`docker-compose.portainer.yml`](docker-compose.portainer.yml)
+> through Portainer (see [RELEASING.md](RELEASING.md) for how to redeploy new
+> versions - Synology's own Container Manager "check for update" badge doesn't
+> reliably track images managed this way), or follow Option 1 below directly
+> over SSH.
 
 ### Option 1: Docker Deployment (Recommended)
 
@@ -422,6 +428,20 @@ Edit `docker-compose.yml` to customize:
 
 ## Troubleshooting
 
+### "EOFError: EOF when reading a line"
+
+Seen in container logs (Synology Container Manager included) when `secrets.json`
+is missing or not properly mounted - Method 1/2's underlying library tries to
+prompt for interactive input and there's no terminal attached. Verify the
+volume mount points at a real file, not an empty directory Docker may have
+created (`touch auth_data/secrets.json` before the first `docker compose up`
+fixes this - see [Docker Compose Configuration for auth_data Volume](AUTHENTICATION.md#docker-compose-configuration-for-auth_data-volume)),
+or switch to Method 3 (no interactive prompt at all).
+
+Run `bash check_auth.sh` for a quick diagnostic (checks `auth_data/` exists,
+`secrets.json` has content, the container is running, and the file is mounted
+inside it).
+
 ### Authentication Issues
 
 **Authentication fails in Docker (headless mode)**:
@@ -522,7 +542,6 @@ pytest
 ├── docker-compose.portainer.yml   # Production: pulls the published image
 ├── AUTHENTICATION.md              # Comprehensive authentication guide
 ├── RELEASING.md                   # How the Docker image gets published (GitHub Actions)
-├── SYNOLOGY_SETUP.md              # Synology NAS deployment guide
 ├── TECHNICAL_FIX.md               # FCM async-compatibility fix write-up
 ├── CHANGELOG.md
 ├── LICENSE                        # GPL-3.0
@@ -558,85 +577,6 @@ The service uses FastAPI's lifespan events to manage a background asyncio task t
 5. Repeats every 5 minutes
 
 This approach ensures location data is always fresh while minimizing API calls and network usage.
-
-## Synology NAS Deployment
-
-Two ways to run this on a Synology NAS:
-
-- **Build it yourself with Container Manager's "Project" feature** - covered below
-  and in [SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md). Builds the image on the NAS itself
-  from this repo's `Dockerfile`.
-- **Pull a pre-built image via Portainer** - faster (no build on the NAS), works with
-  a private Docker Hub image published by CI. See [RELEASING.md](RELEASING.md) and
-  [`docker-compose.portainer.yml`](docker-compose.portainer.yml). Note: Synology's
-  own Container Manager "check for update" badge doesn't reliably track images
-  managed this way - see RELEASING.md for how to actually redeploy a new version.
-
-### ⚠️ Important: Authentication
-
-**If using Method 1 or 2, you must authenticate on your Mac/PC before deploying
-to Synology NAS** - those methods can't do an interactive login inside the
-container. **This isn't required with Method 3**: authenticate directly on
-the NAS through a browser instead - see
-[AUTHENTICATION.md, Method 3](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed).
-
-### Quick Start
-
-1. **Authenticate on your Mac/PC** (see "Setup and Installation" section above)
-2. **Copy `secrets.json`** to the `auth_data/` directory
-3. **Upload this repo** to your Synology NAS
-4. **Deploy using Container Manager**
-
-### 📖 Detailed Setup Guide
-
-For complete step-by-step instructions, troubleshooting, and common errors, see:
-
-**[SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md)** - Comprehensive Synology deployment guide
-
-### Common Error: "EOFError: EOF when reading a line"
-
-If you see this error in Container Manager logs, it means the `secrets.json` file is missing or not properly mounted. See [SYNOLOGY_SETUP.md](SYNOLOGY_SETUP.md) for the solution.
-
-### Quick Deployment Steps
-
-1. **Authenticate on your computer**:
-
-   ```bash
-   cd GoogleFindMyTools
-   python3 main.py
-   cp Auth/secrets.json ../auth_data/
-   ```
-
-2. **Upload to Synology**:
-
-   - Upload this repo to `/docker/google-findmy-api/`
-   - Verify `secrets.json` is in `/docker/google-findmy-api/auth_data/`
-
-3. **Deploy using Container Manager**:
-
-   - Open Container Manager → Project tab
-   - Create new project from `/docker/google-findmy-api/docker-compose.yml`
-   - Build and start
-
-4. **Access the API**:
-   - API: `http://YOUR_NAS_IP:8000`
-   - Docs: `http://YOUR_NAS_IP:8000/docs`
-   - All features including automatic location updates work out of the box!
-
-### Technical Details
-
-**Fixed: Event Loop Compatibility Issue**
-
-Previous versions had issues with FCM (Firebase Cloud Messaging) in Docker environments due to nested event loop problems in the GoogleFindMyTools library. This has been **permanently fixed** by patching the library during Docker build to use proper async/await patterns.
-
-The service now includes:
-
-- ✅ Automatic FCM receiver patching during build
-- ✅ Proper async/await implementation
-- ✅ Full compatibility with Synology NAS and other Docker environments
-- ✅ Automatic location updates working in all environments
-
-**Backward Compatibility**: The `ENABLE_LOCATION_UPDATES` environment variable is still available if you need to disable location updates for any reason, but it's no longer necessary for stability.
 
 ## Security Considerations
 
