@@ -37,7 +37,7 @@ else
     echo "      python3 main.py"
     echo ""
     echo "   4. Copy the secrets file:"
-    echo "      cp Auth/secrets.json /path/to/google-findmy-api/auth_data/"
+    echo "      cp Auth/secrets.json /path/to/google-find-my-device-rest-api/auth_data/"
     echo ""
     echo "   5. Upload auth_data/secrets.json to your Synology NAS"
     exit 1
@@ -45,13 +45,13 @@ fi
 
 echo ""
 echo "3. Checking Docker container (if running)..."
-if docker ps | grep -q google-findmy-api; then
+if docker ps | grep -q google-find-my-device-rest-api; then
     echo "   ✓ Container is running"
     echo ""
     echo "4. Checking secrets.json inside container..."
-    if docker exec google-findmy-api test -f /app/auth_data/secrets.json; then
+    if docker exec google-find-my-device-rest-api test -f /app/auth_data/secrets.json; then
         echo "   ✓ secrets.json is mounted in container"
-        docker exec google-findmy-api ls -lh /app/auth_data/secrets.json
+        docker exec google-find-my-device-rest-api ls -lh /app/auth_data/secrets.json
     else
         echo "   ✗ secrets.json NOT found in container"
         echo "   The volume mount may not be working correctly"

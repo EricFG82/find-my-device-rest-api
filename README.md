@@ -133,7 +133,7 @@ safe to check without risking a crash-loop.
    docker-compose build
 
    # Run authentication in interactive mode
-   docker compose run --rm -w /app/GoogleFindMyTools google-findmy-api python main.py
+   docker compose run --rm -w /app/GoogleFindMyTools google-find-my-device-rest-api python main.py
    ```
 
    **Note**: This method uses headless Chrome inside Docker, which may have limitations with certain authentication flows (e.g., CAPTCHA, advanced 2FA). If you encounter issues, use Method 1 or Method 3 instead.
@@ -169,7 +169,7 @@ safe to check without risking a crash-loop.
 
    ```bash
    docker-compose ps
-   docker-compose logs -f google-findmy-api
+   docker-compose logs -f google-find-my-device-rest-api
    ```
 
 5. **Access the API**:
@@ -344,13 +344,13 @@ of it and the environment variables you can tune:
 
 ```yaml
 services:
-  google-findmy-api:
+  google-find-my-device-rest-api:
     build:
       context: .
       dockerfile: Dockerfile
     # Or, to pull the pre-built image instead of building locally:
     # image: ericfg82/google-find-my-device-rest-api:v1.2.0
-    container_name: google-findmy-api
+    container_name: google-find-my-device-rest-api
     ports:
       - "8000:8000" # REST API
       - "6080:6080" # noVNC web UI (in-browser auth - only serves anything mid-login)
@@ -517,7 +517,7 @@ pip3 install selenium undetected-chromedriver gpsoauth requests beautifulsoup4 p
 Check the logs:
 
 ```bash
-docker-compose logs -f google-findmy-api
+docker-compose logs -f google-find-my-device-rest-api
 ```
 
 Common issues:

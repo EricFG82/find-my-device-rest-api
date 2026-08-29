@@ -144,7 +144,7 @@ This method runs authentication in a headless browser inside the Docker containe
 2. **Run authentication in the container**:
 
    ```bash
-   docker compose run --rm -w /app/GoogleFindMyTools google-findmy-api python main.py
+   docker compose run --rm -w /app/GoogleFindMyTools google-find-my-device-rest-api python main.py
    ```
 
 3. **Follow the on-screen instructions**:
@@ -259,11 +259,11 @@ the `secrets.json` file in:
 
 ```yaml
 services:
-  google-findmy-api:
+  google-find-my-device-rest-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: google-findmy-api
+    container_name: google-find-my-device-rest-api
     ports:
       - "8000:8000"
       - "6080:6080" # noVNC web UI (in-browser auth)
@@ -326,7 +326,7 @@ Check that the file is accessible:
 ls -la auth_data/secrets.json
 
 # From inside the container
-docker compose exec google-findmy-api ls -la /app/GoogleFindMyTools/Auth/secrets.json
+docker compose exec google-find-my-device-rest-api ls -la /app/GoogleFindMyTools/Auth/secrets.json
 ```
 
 ---
@@ -518,7 +518,7 @@ After successful authentication:
 If you continue to have authentication issues:
 
 1. Check the [Troubleshooting](#troubleshooting) section above
-2. Review the logs: `docker compose logs -f google-findmy-api`
+2. Review the logs: `docker compose logs -f google-find-my-device-rest-api`
 3. Try Method 1 if you were using Method 2
 4. Ensure Find My Device is enabled on your Google account
 5. Check that you have an Android device associated with your account

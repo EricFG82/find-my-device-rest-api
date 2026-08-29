@@ -1,7 +1,7 @@
 services:
-  google-findmy-api:
+  google-find-my-device-rest-api:
     image: ericfg82/google-find-my-device-rest-api:v1.2.1
-    container_name: google-findmy-api
+    container_name: google-find-my-device-rest-api
     ports:
       - "8000:8000"
       # noVNC web UI for the in-browser (VNC) authentication flow - see
@@ -11,7 +11,7 @@ services:
     volumes:
       # Point this at a real secrets.json on the NAS (obtained via GoogleFindMyTools auth,
       # see AUTHENTICATION.md). The image never contains secrets.json - it's mounted here.
-      - /volume1/docker/google-findmy-api/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json
+      - /volume1/docker/google-find-my-device-rest-api/secrets.json:/app/GoogleFindMyTools/Auth/secrets.json
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO

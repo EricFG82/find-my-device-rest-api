@@ -74,7 +74,7 @@ from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 2. In Portainer → **Stacks → your stack → Editor**, paste the updated compose file
    (or pull the change if the stack is git-linked), check **"Re-pull image"**, and
    **Update the stack**.
-3. Confirm: `docker inspect google-findmy-api --format '{{.Image}}'` should match
+3. Confirm: `docker inspect google-find-my-device-rest-api --format '{{.Image}}'` should match
    the digest Docker Hub shows for that tag.
 
 Don't rely on Synology Container Manager's "check for update" badge - it doesn't

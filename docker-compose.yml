@@ -1,9 +1,9 @@
 services:
-  google-findmy-api:
+  google-find-my-device-rest-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: google-findmy-api
+    container_name: google-find-my-device-rest-api
     ports:
       - "8000:8000"
       # noVNC web UI for the in-browser (VNC) authentication flow - see
