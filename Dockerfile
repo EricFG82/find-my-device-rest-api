@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install system dependencies including Chromium (works on both amd64 and arm64)
 # xvfb/x11vnc/openbox/novnc/websockify support the in-browser VNC authentication
-# flow (see rest-api/app/services/vnc_auth_service.py and AUTHENTICATION.md).
+# flow (see app/services/vnc_auth_service.py and AUTHENTICATION.md).
 # tini runs as PID 1 (see ENTRYPOINT below) so orphaned grandchild processes
 # (chromedriver/chromium, spawned by the VNC auth flow) actually get reaped
 # instead of accumulating as zombies - uvicorn alone doesn't do this.

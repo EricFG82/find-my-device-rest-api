@@ -227,7 +227,7 @@ With multiple devices in one background update cycle, this reliably produced:
 
 **Fix**: add `self._listening = True` right after `await
 self._register_for_fcm_and_listen()` in both `register_for_location_updates()` and
-`get_android_id()`, in `rest-api/patch_fcm_receiver.py`. Verified afterward: a full
+`get_android_id()`, in `patch_fcm_receiver.py`. Verified afterward: a full
 background update cycle across 6 real devices now does exactly one MCS login, zero
 task/race warnings, and all 6 locations update successfully.
 

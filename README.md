@@ -1,6 +1,8 @@
 # Google Find My Device REST API Service
 
-A REST API service that exposes Google Find My Device functionality using the [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools) library.
+A REST API service that exposes Google Find My Device functionality using the [GoogleFindMyTools](https://github.com/leonboe1/GoogleFindMyTools) library. Standalone - usable with anything that can make HTTP calls, not just Home Assistant.
+
+> Looking for the Home Assistant custom integration? See [ha_google_find](https://github.com/EricFG82/ha_google_find) - it talks to this API over HTTP.
 
 > Deploying a pre-built image via Portainer, or cutting a new release? See [RELEASING.md](RELEASING.md).
 
@@ -34,7 +36,7 @@ A REST API service that exposes Google Find My Device functionality using the [G
 - `GET /api/v1/devices/{device_id}` - Get detailed information for a specific device
 - `POST /auth/vnc/start` / `GET /auth/vnc/status` / `POST /auth/vnc/stop` -
   In-browser authentication (no local Chrome needed) via noVNC - see
-  [AUTHENTICATION.md](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
+  [AUTHENTICATION.md](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
 
 ### Documentation
 
@@ -60,19 +62,13 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
 ### Option 1: Docker Deployment (Recommended)
 
-1. **Navigate to the REST API directory**:
-
-   ```bash
-   cd rest-api
-   ```
-
-2. **Create auth data directory**:
+1. **Create auth data directory**:
 
    ```bash
    mkdir -p auth_data
    ```
 
-3. **First-time authentication** (required before running the service):
+2. **First-time authentication** (required before running the service):
 
    Since the service needs to authenticate with Google, you need to run the authentication process first. Choose one of the following methods:
 
@@ -81,9 +77,6 @@ A REST API service that exposes Google Find My Device functionality using the [G
    This method is easier and more reliable as it allows you to use your system's Chrome browser for authentication:
 
    ```bash
-   # Navigate to the project root
-   cd ..
-
    # Install Python dependencies (one-time setup)
    pip3 install -r GoogleFindMyTools/requirements.txt
 
@@ -105,10 +98,10 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
    ```bash
    # Copy authentication file to Docker volume
-   cp Auth/secrets.json ../rest-api/auth_data/
+   cp Auth/secrets.json ../auth_data/
 
-   # Return to rest-api directory
-   cd ../rest-api
+   # Return to the project root
+   cd ..
    ```
 
    #### Method 2: Authenticate Inside Docker (Advanced)
@@ -131,7 +124,7 @@ A REST API service that exposes Google Find My Device functionality using the [G
 
    Full CAPTCHA/2FA support like Method 1, but entirely through the container -
    nothing to install locally, nothing to copy over. See
-   [AUTHENTICATION.md](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
+   [AUTHENTICATION.md](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed)
    for the full walkthrough; the short version:
 
    ```bash
@@ -141,20 +134,20 @@ A REST API service that exposes Google Find My Device functionality using the [G
    curl http://localhost:8000/auth/vnc/status           # watch for "succeeded" - no restart needed
    ```
 
-4. **Start the service**:
+3. **Start the service**:
 
    ```bash
    docker-compose up -d
    ```
 
-5. **Check service status**:
+4. **Check service status**:
 
    ```bash
    docker-compose ps
    docker-compose logs -f google-findmy-api
    ```
 
-6. **Access the API**:
+5. **Access the API**:
    - API: http://localhost:8000
    - Interactive docs: http://localhost:8000/docs
    - Health check: http://localhost:8000/health
@@ -164,7 +157,6 @@ A REST API service that exposes Google Find My Device functionality using the [G
 1. **Clone GoogleFindMyTools**:
 
    ```bash
-   cd rest-api
    git clone https://github.com/leonboe1/GoogleFindMyTools.git
    ```
 
@@ -485,26 +477,35 @@ pytest
 ### Code Structure
 
 ```
-rest-api/
+.
 ├── app/
 │   ├── __init__.py
-│   ├── main.py              # FastAPI application
-│   ├── models.py            # Pydantic models
+│   ├── main.py                    # FastAPI application
+│   ├── models.py                  # Pydantic models
 │   └── services/
 │       ├── __init__.py
-│       └── device_service.py # Device service logic
-├── patch_chrome_driver.py   # Patch for Chrome driver compatibility
-├── patch_fcm_receiver.py    # Patch for FCM async compatibility
-├── Dockerfile                        # Also accepts an APP_VERSION build-arg (see RELEASING.md)
-├── docker-compose.yml                # Local dev: builds the image from source
-├── docker-compose.portainer.yml      # Production: pulls the published image
-├── RELEASING.md                      # How the Docker image gets published (GitHub Actions)
+│       ├── device_service.py      # Device service logic
+│       └── vnc_auth_service.py    # In-browser (VNC) auth session manager
+├── vnc_auth_entrypoint.py         # Runtime script that drives the VNC login
+├── patch_chrome_driver.py         # Patch for Chrome driver compatibility
+├── patch_fcm_receiver.py          # Patch for FCM async compatibility
+├── patch_auth_flow.py             # Patch removing the interactive Enter-to-continue prompt
+├── openbox-rc.xml                 # Window manager config for the VNC auth flow
+├── Dockerfile                     # Also accepts an APP_VERSION build-arg (see RELEASING.md)
+├── docker-compose.yml             # Local dev: builds the image from source
+├── docker-compose.portainer.yml   # Production: pulls the published image
+├── AUTHENTICATION.md              # Comprehensive authentication guide
+├── RELEASING.md                   # How the Docker image gets published (GitHub Actions)
+├── SYNOLOGY_SETUP.md              # Synology NAS deployment guide
+├── TECHNICAL_FIX.md               # FCM async-compatibility fix write-up
+├── CHANGELOG.md
+├── LICENSE                        # GPL-3.0
 ├── requirements.txt
-└── README.md
+└── README.md                      # This file
 ```
 
 Publishing the Docker image is handled entirely by
-[`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) -
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) -
 there's no local build/push script; see [RELEASING.md](RELEASING.md).
 
 ### Technical Implementation Details
@@ -551,13 +552,13 @@ Two ways to run this on a Synology NAS:
 to Synology NAS** - those methods can't do an interactive login inside the
 container. **This isn't required with Method 3**: authenticate directly on
 the NAS through a browser instead - see
-[AUTHENTICATION.md, Method 3](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed).
+[AUTHENTICATION.md, Method 3](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed).
 
 ### Quick Start
 
 1. **Authenticate on your Mac/PC** (see "Setup and Installation" section above)
-2. **Copy `secrets.json`** to `rest-api/auth_data/` directory
-3. **Upload entire `rest-api` folder** to your Synology NAS
+2. **Copy `secrets.json`** to the `auth_data/` directory
+3. **Upload this repo** to your Synology NAS
 4. **Deploy using Container Manager**
 
 ### 📖 Detailed Setup Guide
@@ -577,18 +578,18 @@ If you see this error in Container Manager logs, it means the `secrets.json` fil
    ```bash
    cd GoogleFindMyTools
    python3 main.py
-   cp Auth/secrets.json ../rest-api/auth_data/
+   cp Auth/secrets.json ../auth_data/
    ```
 
 2. **Upload to Synology**:
 
-   - Upload entire `rest-api` folder to `/docker/google-findmy-api/`
-   - Verify `secrets.json` is in `/docker/google-findmy-api/rest-api/auth_data/`
+   - Upload this repo to `/docker/google-findmy-api/`
+   - Verify `secrets.json` is in `/docker/google-findmy-api/auth_data/`
 
 3. **Deploy using Container Manager**:
 
    - Open Container Manager → Project tab
-   - Create new project from `/docker/google-findmy-api/rest-api/docker-compose.yml`
+   - Create new project from `/docker/google-findmy-api/docker-compose.yml`
    - Build and start
 
 4. **Access the API**:
@@ -618,9 +619,22 @@ The service now includes:
 - The `secrets.json` file contains sensitive authentication data - keep it secure
 - Consider using environment variables for sensitive configuration
 
+## Disclaimer
+
+This project is provided **"as is", with no warranty of any kind** (see
+[LICENSE](LICENSE) for the full GPL-3.0 disclaimer) - the author(s) are not
+liable for any damages, data loss, account restrictions, or other issues
+arising from its use.
+
+It's an **unofficial, reverse-engineered integration**, not affiliated with,
+endorsed by, or supported by Google. It accesses Google's Find My Device
+network through undocumented APIs that Google could change, block, or
+restrict at any time, and use may be subject to Google's Terms of Service.
+Use at your own risk, with your own Google account.
+
 ## License
 
-GPL-3.0 - see the [root LICENSE](../LICENSE) for the full text and why (this
+GPL-3.0 - see [LICENSE](LICENSE) for the full text and why (this
 service imports the GPL-3.0-licensed GoogleFindMyTools directly).
 
 ## Credits

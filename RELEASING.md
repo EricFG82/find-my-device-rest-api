@@ -23,7 +23,7 @@ git tag vX.Y.Z  ──push──>  GitHub Action  ──build & push──>  Doc
   exist in the CI checkout the workflow builds from. The running container always
   gets it via a volume/file mount instead - see
   [`docker-compose.portainer.yml`](docker-compose.portainer.yml) and
-  [`AUTHENTICATION.md`](../AUTHENTICATION.md).
+  [`AUTHENTICATION.md`](AUTHENTICATION.md).
 - The build disables buildx's provenance/SBOM attestations (`provenance: false`,
   `sbom: false` in the workflow). Without this, buildx wraps the image in an OCI
   index with an extra "attestation manifest" that Synology's Container Manager
@@ -56,8 +56,8 @@ git tag vX.Y.Z
 git push origin main --tags
 ```
 
-Pushing the tag triggers [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml),
-which builds the image from `rest-api/` and pushes both `ericfg82/google-findmy-api:vX.Y.Z`
+Pushing the tag triggers [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml),
+which builds the image from this repo and pushes both `ericfg82/google-findmy-api:vX.Y.Z`
 and `:latest`. Watch it under the repo's **Actions** tab.
 
 To publish `:latest` without cutting a tagged version (e.g. to smoke-test a change
@@ -66,8 +66,8 @@ from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 
 ## Deploying a new version to the NAS
 
-`rest-api/docker-compose.portainer.yml` pins a specific version tag (currently
-`v1.1.1`) rather than `:latest`, so redeploys are deliberate:
+`docker-compose.portainer.yml` pins a specific version tag (currently
+`v1.2.0`) rather than `:latest`, so redeploys are deliberate:
 
 1. Bump the `image:` tag in `docker-compose.portainer.yml` to the new version and
    commit it.

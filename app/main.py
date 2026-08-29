@@ -30,7 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Set via --build-arg APP_VERSION at image build time (see rest-api/RELEASING.md);
+# Set via --build-arg APP_VERSION at image build time (see RELEASING.md);
 # defaults to "0.0.0-dev" for local, non-image runs (e.g. uvicorn --reload).
 APP_VERSION = os.getenv("APP_VERSION", "0.0.0-dev")
 

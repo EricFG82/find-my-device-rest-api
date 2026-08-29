@@ -1,0 +1,52 @@
+name: Build and publish Docker image
+
+# Runs when a version tag (vX.Y.Z) is pushed, publishing both that tag and
+# :latest to the private Docker Hub repo. This is the ONLY way to publish this
+# image - can also be triggered manually from the Actions tab (workflow_dispatch),
+# which publishes :latest only. See RELEASING.md.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine image tags and app version
+        id: meta
+        run: |
+          IMAGE="ericfg82/google-findmy-api"
+          TAGS="${IMAGE}:latest"
+          VERSION="latest"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            TAGS="${IMAGE}:${GITHUB_REF_NAME},${TAGS}"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "app_version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.app_version }}

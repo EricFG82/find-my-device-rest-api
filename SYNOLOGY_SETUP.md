@@ -19,7 +19,7 @@ input("[AuthFlow] Press Enter to continue...")
 
 > **This is no longer the only option.** You can now authenticate directly on
 > the NAS through a browser - no Mac/PC step needed at all. See
-> [AUTHENTICATION.md, Method 3](../AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed):
+> [AUTHENTICATION.md, Method 3](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed):
 > start the container with no `secrets.json`, call `POST /auth/vnc/start`,
 > and log in through the returned URL. The rest of this guide (Steps 1-2,
 > authenticating on your Mac/PC first) is still valid if you prefer it, but
@@ -74,17 +74,17 @@ requirement** - see the note above.
 
 ### Step 2: Prepare Files for Synology
 
-1. **Copy the secrets file to the rest-api directory**:
+1. **Copy the secrets file into this repo's `auth_data` directory**:
 
    ```bash
-   # From the GoogleFindMyTools directory
-   mkdir -p ../rest-api/auth_data
-   cp Auth/secrets.json ../rest-api/auth_data/
+   # From the GoogleFindMyTools directory, inside a clone of this repo
+   mkdir -p ../auth_data
+   cp Auth/secrets.json ../auth_data/
    ```
 
 2. **Verify the file was copied**:
    ```bash
-   ls -lh ../rest-api/auth_data/secrets.json
+   ls -lh ../auth_data/secrets.json
    ```
 
 ### Step 3: Upload to Synology NAS
@@ -96,19 +96,18 @@ requirement** - see the note above.
 
    ```
    /docker/google-findmy-api/
-   ├── rest-api/
-   │   ├── auth_data/
-   │   │   └── secrets.json    ← IMPORTANT!
-   │   ├── app/
-   │   ├── Dockerfile
-   │   ├── docker-compose.yml
-   │   └── ... (other files)
+   ├── auth_data/
+   │   └── secrets.json    ← IMPORTANT!
+   ├── app/
+   ├── Dockerfile
+   ├── docker-compose.yml
+   └── ... (other files)
    ```
 
-3. Upload the entire `rest-api` folder to `/docker/google-findmy-api/`
+3. Upload this entire repo to `/docker/google-findmy-api/`
 
 4. **CRITICAL**: Verify `secrets.json` is in the correct location:
-   - Path should be: `/docker/google-findmy-api/rest-api/auth_data/secrets.json`
+   - Path should be: `/docker/google-findmy-api/auth_data/secrets.json`
    - File size should be several KB (not empty)
    - **Important**: The docker-compose.yml mounts only the `secrets.json` file (not the entire `auth_data` directory) to preserve the Python modules in the Auth directory
 
@@ -120,13 +119,13 @@ requirement** - see the note above.
 
    ```bash
    # From your Mac/PC
-   scp -r rest-api your-username@synology-ip:/volume1/docker/google-findmy-api/
+   scp -r google-findmy-api your-username@synology-ip:/volume1/docker/
    ```
 
 3. **SSH into Synology and verify**:
    ```bash
    ssh your-username@synology-ip
-   ls -lh /volume1/docker/google-findmy-api/rest-api/auth_data/secrets.json
+   ls -lh /volume1/docker/google-findmy-api/auth_data/secrets.json
    ```
 
 ### Step 4: Deploy on Synology
@@ -140,7 +139,7 @@ requirement** - see the note above.
 4. **Set project settings**:
 
    - Project Name: `google-findmy-api`
-   - Path: `/docker/google-findmy-api/rest-api`
+   - Path: `/docker/google-findmy-api`
    - Source: `docker-compose.yml`
 
 5. **Click "Build"** to create the container
@@ -181,7 +180,7 @@ requirement** - see the note above.
 
 **Solution**:
 
-1. Verify `secrets.json` exists in `rest-api/auth_data/` on Synology
+1. Verify `secrets.json` exists in `auth_data/` on Synology
 2. Check file is not empty: `ls -lh auth_data/secrets.json`
 3. Verify volume mount in docker-compose.yml:
    ```yaml
@@ -242,7 +241,7 @@ requirement** - see the note above.
 Run this script to check your setup:
 
 ```bash
-cd /volume1/docker/google-findmy-api/rest-api
+cd /volume1/docker/google-findmy-api
 bash check_auth.sh
 ```
 
@@ -259,9 +258,9 @@ Before deploying to Synology, verify:
 
 - [ ] Authenticated on Mac/PC using `python3 main.py`
 - [ ] `secrets.json` file exists and is not empty
-- [ ] Copied `secrets.json` to `rest-api/auth_data/`
-- [ ] Uploaded entire `rest-api` folder to Synology
-- [ ] Verified file path: `/docker/google-findmy-api/rest-api/auth_data/secrets.json`
+- [ ] Copied `secrets.json` to `auth_data/`
+- [ ] Uploaded this entire repo to Synology
+- [ ] Verified file path: `/docker/google-findmy-api/auth_data/secrets.json`
 - [ ] Built container in Container Manager
 - [ ] Container shows "Running" status
 - [ ] Logs show "Authentication verified"

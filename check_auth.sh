@@ -37,7 +37,7 @@ else
     echo "      python3 main.py"
     echo ""
     echo "   4. Copy the secrets file:"
-    echo "      cp Auth/secrets.json /path/to/rest-api/auth_data/"
+    echo "      cp Auth/secrets.json /path/to/google-findmy-api/auth_data/"
     echo ""
     echo "   5. Upload auth_data/secrets.json to your Synology NAS"
     exit 1
