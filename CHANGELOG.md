@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-08-29
+
+### Changed
+
+- Repo renamed from `google-findmy-api` to `google-find-my-device-rest-api`;
+  the Docker image moved to `ericfg82/google-find-my-device-rest-api` (now
+  public, matching the repo) to go with it. No functional changes.
+
 ## [1.2.0] - 2026-08-29
 
 ### Added

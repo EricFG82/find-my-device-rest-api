@@ -1,6 +1,6 @@
 services:
   google-findmy-api:
-    image: ericfg82/google-find-my-device-rest-api:v1.2.0
+    image: ericfg82/google-find-my-device-rest-api:v1.2.1
     container_name: google-findmy-api
     ports:
       - "8000:8000"

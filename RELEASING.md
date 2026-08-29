@@ -1,6 +1,6 @@
 # Releasing the REST API Docker image
 
-The REST API is published as a **private** Docker Hub image:
+The REST API is published as a public Docker Hub image:
 `docker.io/ericfg82/google-find-my-device-rest-api`. This document covers how to cut a
 new version and get it running on the NAS.
 
@@ -12,7 +12,7 @@ someone's laptop at the time.
 ## Overview
 
 ```
-git tag vX.Y.Z  ──push──>  GitHub Action  ──build & push──>  Docker Hub (private)
+git tag vX.Y.Z  ──push──>  GitHub Action  ──build & push──>  Docker Hub (public)
                                                                      │
                                                         Portainer "Pull and redeploy"
                                                                      ▼
@@ -67,7 +67,7 @@ from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 ## Deploying a new version to the NAS
 
 `docker-compose.portainer.yml` pins a specific version tag (currently
-`v1.2.0`) rather than `:latest`, so redeploys are deliberate:
+`v1.2.1`) rather than `:latest`, so redeploys are deliberate:
 
 1. Bump the `image:` tag in `docker-compose.portainer.yml` to the new version and
    commit it.

@@ -1,7 +1,7 @@
 name: Build and publish Docker image
 
 # Runs when a version tag (vX.Y.Z) is pushed, publishing both that tag and
-# :latest to the private Docker Hub repo. This is the ONLY way to publish this
+# :latest to the Docker Hub repo. This is the ONLY way to publish this
 # image - can also be triggered manually from the Actions tab (workflow_dispatch),
 # which publishes :latest only. See RELEASING.md.
 on:
