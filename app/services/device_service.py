@@ -471,9 +471,25 @@ class DeviceService:
             # winning over a genuinely fresher one.
             location_data = None
             if network_locations:
-                loc, time = max(
-                    zip(network_locations, network_locations_time),
-                    key=lambda candidate: candidate[1].seconds,
+                candidates = list(zip(network_locations, network_locations_time))
+                logger.info(
+                    "Device %s: %d location candidate(s) in Google's response: %s",
+                    device_id,
+                    len(candidates),
+                    [
+                        {
+                            "timestamp": int(c_time.seconds),
+                            "own_report": c_loc.geoLocation.encryptedReport.publicKeyRandom == b"",
+                            "status": str(c_loc.status),
+                        }
+                        for c_loc, c_time in candidates
+                    ],
+                )
+                loc, time = max(candidates, key=lambda candidate: candidate[1].seconds)
+                logger.info(
+                    "Device %s: picked candidate with timestamp %d",
+                    device_id,
+                    int(time.seconds),
                 )
 
                 if loc.status == Common_pb2.Status.SEMANTIC:

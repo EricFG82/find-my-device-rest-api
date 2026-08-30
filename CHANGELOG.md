@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.6] - 2026-08-30
+
+### Added
+
+- Diagnostic logging (INFO level) listing every location candidate in
+  Google's response (timestamp, own-report vs. network report, status)
+  and which one got picked, to help tell apart "the newest-by-timestamp
+  fix (1.2.5) is working but Google's network-location data itself is
+  imprecise/delayed" from "there's still a fresher candidate being
+  missed" - no behavior change.
+
 ## [1.2.5] - 2026-08-30
 
 ### Fixed
