@@ -29,7 +29,7 @@ jobs:
       - name: Determine image tags and app version
         id: meta
         run: |
-          IMAGE="ericfg82/google-find-my-device-rest-api"
+          IMAGE="ericfg82/find-my-device-rest-api"
           TAGS="${IMAGE}:latest"
           VERSION="latest"
           if [ "${{ github.event_name }}" = "push" ]; then

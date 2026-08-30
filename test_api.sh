@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test script for Google Find My Device REST API
+# Test script for the Find My Device REST API
 # This script tests all API endpoints and displays the results
 
 set -e
@@ -66,7 +66,7 @@ api_request() {
 # Main test sequence
 main() {
     echo "======================================"
-    echo "Google Find My Device REST API Tests"
+    echo "Find My Device REST API Tests"
     echo "======================================"
     echo "API URL: $API_URL"
     echo ""

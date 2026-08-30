@@ -1,5 +1,5 @@
 """
-GoogleFindMyTools REST API Service
+Find My Device REST API Service
 A REST API service that exposes Google Find My Device functionality
 """
 
@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
     global device_service
     
     # Startup
-    logger.info("Starting GoogleFindMyTools REST API Service...")
+    logger.info("Starting Find My Device REST API Service...")
     device_service = DeviceService(vnc_auth_service=vnc_auth_service)
     try:
         await device_service.initialize()
@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down GoogleFindMyTools REST API Service...")
+    logger.info("Shutting down Find My Device REST API Service...")
     if device_service:
         await device_service.cleanup()
     await vnc_auth_service.stop()
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="GoogleFindMyTools REST API",
+    title="Find My Device REST API",
     description="REST API service for Google Find My Device functionality",
     version=APP_VERSION,
     lifespan=lifespan,
@@ -116,7 +116,7 @@ app.add_middleware(
 async def root():
     """Root endpoint with API information"""
     return {
-        "name": "GoogleFindMyTools REST API",
+        "name": "Find My Device REST API",
         "version": APP_VERSION,
         "description": "REST API service for Google Find My Device functionality",
         "endpoints": {

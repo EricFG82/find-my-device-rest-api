@@ -1,7 +1,7 @@
 # Releasing the REST API Docker image
 
 The REST API is published as a public Docker Hub image:
-`docker.io/ericfg82/google-find-my-device-rest-api`. This document covers how to cut a
+`docker.io/ericfg82/find-my-device-rest-api`. This document covers how to cut a
 new version and get it running on the NAS.
 
 **GitHub Actions is the only way this image gets published** - there is no local
@@ -57,7 +57,7 @@ git push origin main --tags
 ```
 
 Pushing the tag triggers [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml),
-which builds the image from this repo and pushes both `ericfg82/google-find-my-device-rest-api:vX.Y.Z`
+which builds the image from this repo and pushes both `ericfg82/find-my-device-rest-api:vX.Y.Z`
 and `:latest`. Watch it under the repo's **Actions** tab.
 
 To publish `:latest` without cutting a tagged version (e.g. to smoke-test a change
@@ -67,14 +67,14 @@ from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 ## Deploying a new version to the NAS
 
 `docker-compose.portainer.yml` pins a specific version tag (currently
-`v1.2.1`) rather than `:latest`, so redeploys are deliberate:
+`v1.2.2`) rather than `:latest`, so redeploys are deliberate:
 
 1. Bump the `image:` tag in `docker-compose.portainer.yml` to the new version and
    commit it.
 2. In Portainer → **Stacks → your stack → Editor**, paste the updated compose file
    (or pull the change if the stack is git-linked), check **"Re-pull image"**, and
    **Update the stack**.
-3. Confirm: `docker inspect google-find-my-device-rest-api --format '{{.Image}}'` should match
+3. Confirm: `docker inspect find-my-device-rest-api --format '{{.Image}}'` should match
    the digest Docker Hub shows for that tag.
 
 Don't rely on Synology Container Manager's "check for update" badge - it doesn't
