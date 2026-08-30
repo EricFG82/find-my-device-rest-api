@@ -1,6 +1,6 @@
 services:
   find-my-device-rest-api:
-    image: ericfg82/find-my-device-rest-api:v1.2.6
+    image: ericfg82/find-my-device-rest-api:v1.2.7
     container_name: find-my-device-rest-api
     ports:
       - "8000:8000"

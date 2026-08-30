@@ -552,6 +552,16 @@ class DeviceService:
         if force:
             return await self._fetch_location_for_device_internal(device_id, device_name, force=True)
 
+        if not self._enable_location_updates:
+            # Nothing else ever populates the cache when the background
+            # updater is disabled - fall through to a live fetch instead of
+            # unconditionally returning None. Still passes force=False, so
+            # _fetch_location_for_device_internal's own freshness check
+            # applies and back-to-back requests within
+            # LOCATION_UPDATE_INTERVAL reuse the cached result instead of
+            # hitting Google every time.
+            return await self._fetch_location_for_device_internal(device_id, device_name, force=False)
+
         try:
             # Return cached location if available
             if device_id in self._location_cache:

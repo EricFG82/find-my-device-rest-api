@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.7] - 2026-08-30
+
+### Fixed
+
+- `GET /api/v1/devices/{device_id}` with `ENABLE_LOCATION_UPDATES=false`
+  never returned a location at all unless the caller explicitly passed
+  `?force=true` - with the background updater disabled, nothing else was
+  ever populating the cache the non-force path just read from. This
+  contradicted the README's own documented behavior ("locations are only
+  fetched on-demand when you call the API"). Now falls through to a live
+  fetch whenever the background updater is disabled, whether `force` was
+  passed or not - still reuses a result cached within
+  `LOCATION_UPDATE_INTERVAL` seconds, so repeated calls don't hit Google
+  every time.
+
 ## [1.2.6] - 2026-08-30
 
 ### Added
