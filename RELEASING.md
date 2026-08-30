@@ -67,7 +67,7 @@ from the **Actions** tab (`workflow_dispatch`) - it publishes `:latest` only.
 ## Deploying a new version to the NAS
 
 `docker-compose.portainer.yml` pins a specific version tag (currently
-`v1.2.4`) rather than `:latest`, so redeploys are deliberate:
+`v1.2.5`) rather than `:latest`, so redeploys are deliberate:
 
 1. Bump the `image:` tag in `docker-compose.portainer.yml` to the new version and
    commit it.

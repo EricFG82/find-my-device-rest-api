@@ -462,9 +462,20 @@ class DeviceService:
                 network_locations.append(recent_location)
                 network_locations_time.append(recent_location_time)
 
-            # Process locations
+            # Pick the candidate with the newest timestamp, not just the first
+            # one in the list - `networkLocations` (crowd-sourced reports from
+            # other people's phones) isn't guaranteed to come back sorted
+            # newest-first, and taking whatever happened to be first (with our
+            # own `recentLocation` appended last, so effectively never reached
+            # whenever any network location existed) is how a stale report kept
+            # winning over a genuinely fresher one.
             location_data = None
-            for loc, time in zip(network_locations, network_locations_time):
+            if network_locations:
+                loc, time = max(
+                    zip(network_locations, network_locations_time),
+                    key=lambda candidate: candidate[1].seconds,
+                )
+
                 if loc.status == Common_pb2.Status.SEMANTIC:
                     # Semantic location (named place)
                     location_data = {
@@ -500,10 +511,6 @@ class DeviceService:
                         'status': str(loc.status),
                         'is_own_report': loc.geoLocation.encryptedReport.isOwnReport
                     }
-
-                # Return the most recent location (first one)
-                if location_data:
-                    break
 
             # Cache the result
             if location_data:

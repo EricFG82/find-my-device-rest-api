@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.5] - 2026-08-30
+
+### Fixed
+
+- A device's location could stay stuck on an old report indefinitely, even
+  right after a successful `?force=true` fetch: when Google's response
+  included more than one location candidate (crowd-sourced "network"
+  reports from other people's phones, plus the device's own most recent
+  report), the code returned whichever one happened to come first in the
+  list - not the most recent one by timestamp. `networkLocations` isn't
+  guaranteed to come back newest-first, and the device's own `recentLocation`
+  was appended to the *end* of that list, so it effectively never won
+  whenever any network report existed. Now picks the candidate with the
+  latest timestamp instead of the first one found.
+
 ## [1.2.4] - 2026-08-30
 
 ### Added
