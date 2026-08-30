@@ -59,10 +59,24 @@ class DeviceService:
         # Enable/disable background location updates (default: true)
         self._enable_location_updates = os.getenv('ENABLE_LOCATION_UPDATES', 'true').lower() == 'true'
 
+        # When a device has both a precise "own report" (from one of your own
+        # signed-in devices) and a less precise crowd-sourced "network report"
+        # (from someone else's phone detecting it over Bluetooth), the default
+        # is to use whichever is newer, even if that's the less precise network
+        # one - freshness over precision. Set to 'true' to prefer the own
+        # report whenever one exists, even if a network report is more recent
+        # (falls back to the newest network report if there's no own report at
+        # all) - matches what Google's own Find My Device app shows.
+        self._prefer_own_report_location = os.getenv('LOCATION_PREFER_OWN_REPORT', 'false').lower() == 'true'
+
         logger.info(f"DeviceService configuration:")
         logger.info(f"  - Device cache TTL: {self._cache_ttl} seconds")
         logger.info(f"  - Location update interval: {self._location_update_interval} seconds")
         logger.info(f"  - Background location updates: {'enabled' if self._enable_location_updates else 'disabled'}")
+        logger.info(
+            f"  - Location selection: "
+            f"{'prefer own report over newer network reports' if self._prefer_own_report_location else 'always use the newest report available'}"
+        )
         
     async def initialize(self):
         """Initialize the device service"""
@@ -485,11 +499,24 @@ class DeviceService:
                         for c_loc, c_time in candidates
                     ],
                 )
-                loc, time = max(candidates, key=lambda candidate: candidate[1].seconds)
+                if self._prefer_own_report_location:
+                    def _is_own_report(c_loc) -> bool:
+                        return (
+                            c_loc.status == Common_pb2.Status.SEMANTIC
+                            or c_loc.geoLocation.encryptedReport.publicKeyRandom == b""
+                        )
+
+                    own_report_candidates = [c for c in candidates if _is_own_report(c[0])]
+                    selection_pool = own_report_candidates or candidates
+                else:
+                    selection_pool = candidates
+
+                loc, time = max(selection_pool, key=lambda candidate: candidate[1].seconds)
                 logger.info(
-                    "Device %s: picked candidate with timestamp %d",
+                    "Device %s: picked candidate with timestamp %d (prefer_own_report=%s)",
                     device_id,
                     int(time.seconds),
+                    self._prefer_own_report_location,
                 )
 
                 if loc.status == Common_pb2.Status.SEMANTIC:

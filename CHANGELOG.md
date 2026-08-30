@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.8] - 2026-08-30
+
+### Added
+
+- `LOCATION_PREFER_OWN_REPORT` environment variable (default: `false`). A
+  device can have both a precise "own report" (from one of your own
+  signed-in devices) and a less precise, crowd-sourced "network report"
+  (from someone else's phone detecting it over Bluetooth). By default
+  (`false`, unchanged from 1.2.5) whichever is newer wins, even if that's
+  the less precise network one. Set to `true` to always prefer the own
+  report when one exists, even over a more recent network report (falls
+  back to the newest network report when there's no own report at all) -
+  matches what the official Google Find My Device app shows, at the cost
+  of possibly showing an older location.
+
 ## [1.2.7] - 2026-08-30
 
 ### Fixed

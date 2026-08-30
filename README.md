@@ -367,6 +367,10 @@ services:
 
       # Set to 'false' to disable automatic background location updates
       - ENABLE_LOCATION_UPDATES=true
+
+      # Set to 'true' to prefer a device's own report over a more recent
+      # but less precise network report (see Environment Variables below)
+      - LOCATION_PREFER_OWN_REPORT=false
     restart: unless-stopped
 ```
 
@@ -402,6 +406,20 @@ You can configure the service using environment variables in `docker-compose.yml
   - When disabled, locations are only fetched on-demand when you call the API
   - Useful for reducing network usage or battery drain
 
+- **`LOCATION_PREFER_OWN_REPORT`**: Prefer the device's own report over a more
+  recent network report (default: `false`)
+  - A device can have both a precise "own report" (from one of your own
+    signed-in devices/phones) and a less precise, crowd-sourced "network
+    report" (from someone else's phone detecting it over Bluetooth). By
+    default, whichever is *newer* wins, even if that's the less precise
+    network one - freshness over precision, which is usually what you want
+    for "where is it right now".
+  - Set to `true` to always prefer the own report when one exists, even if a
+    network report is more recent (falls back to the newest network report
+    when there's no own report at all) - this matches what the official
+    Google Find My Device app shows, at the cost of possibly showing an
+    older location.
+
 #### Example Configuration
 
 ```yaml
@@ -410,6 +428,7 @@ environment:
   - DEVICE_CACHE_TTL=60
   - LOCATION_UPDATE_INTERVAL=180 # Update every 3 minutes
   - ENABLE_LOCATION_UPDATES=true
+  - LOCATION_PREFER_OWN_REPORT=false
 ```
 
 ### How Location Updates Work

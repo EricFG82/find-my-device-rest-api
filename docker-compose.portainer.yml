@@ -1,6 +1,6 @@
 services:
   find-my-device-rest-api:
-    image: ericfg82/find-my-device-rest-api:v1.2.7
+    image: ericfg82/find-my-device-rest-api:v1.2.8
     container_name: find-my-device-rest-api
     ports:
       - "8000:8000"
@@ -28,6 +28,10 @@ services:
       # Enable/disable background location updates (default: true)
       # Set to 'false' to disable automatic location updates
       - ENABLE_LOCATION_UPDATES=true
+
+      # Prefer a device's own report over a more recent but less precise
+      # network report (default: false - the newest report always wins)
+      - LOCATION_PREFER_OWN_REPORT=false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
