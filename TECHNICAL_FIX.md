@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The Google Find My Device REST API service was crashing on Synology NAS (and potentially other Docker environments) with the following error:
+The Find My Device REST API service was crashing on Synology NAS (and potentially other Docker environments) with the following error:
 
 ```
 RuntimeError: There is no current event loop in thread 'ThreadPoolExecutor_0_0'
