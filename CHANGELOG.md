@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.4] - 2026-08-30
+
+### Fixed
+
+- `secrets.json` existing as an empty file (exactly the state
+  `touch auth_data/secrets.json` creates, per this doc's own Docker
+  file-mount workaround) made the very first Method 3 (VNC) login fail
+  with "Could not read secrets file. Aborting." - upstream's
+  `set_cached_value()` treated invalid JSON as fatal instead of just empty,
+  unlike its own `get_cached_value()` right above it. Patched to match.
+- Location reports from *other* people's phones (i.e. any device currently
+  out of range of your own - the common case this project exists for)
+  could never decrypt: doing so needs a "shared key" obtained through a
+  second, separate Google sign-in, which had no support at all - the
+  underlying library's prompt for it hit the same blocking-`input()`
+  problem `auth_flow.py` had before, and even patched away, that second
+  login had nowhere to run (it needs a real display, and only the VNC
+  login process has one). The VNC login flow (`vnc_auth_entrypoint.py`)
+  now triggers this second sign-in itself, in the same browser session,
+  right after the main login succeeds - see AUTHENTICATION.md. A device
+  fetch that needs this key before it's been set up now fails fast with a
+  clear message instead of attempting (and failing, since it can't
+  actually show a login prompt there) from the main API process.
+- Bumped the VNC session timeout (600s → 900s) to comfortably fit two
+  sequential sign-ins instead of one.
+
 ## [1.2.3] - 2026-08-30
 
 ### Added

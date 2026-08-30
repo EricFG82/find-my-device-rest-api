@@ -199,7 +199,7 @@ or anywhere else you can reach over the network.
      "vnc_url": "http://localhost:6080/vnc.html?autoconnect=true&password=aB3xY9kQ",
      "password": "aB3xY9kQ",
      "novnc_port": 6080,
-     "expires_in_seconds": 600
+     "expires_in_seconds": 900
    }
    ```
 
@@ -214,7 +214,15 @@ or anywhere else you can reach over the network.
 4. **Log in normally** - click, type, solve any CAPTCHA, complete 2FA - exactly
    as if Chrome were running on your own screen.
 
-5. **Check progress**:
+5. **A second sign-in may follow** - only needed to decrypt location reports
+   that come from *other* people's phones (i.e. any of your devices currently
+   out of range of your own phone; skip if all your devices are always
+   nearby). Google will ask you to verify your identity by entering the
+   **screen-lock code of one of your Android devices** (not your Google
+   account password) to grant access to your end-to-end encrypted vault.
+   This step is skipped automatically on future logins once it's done once.
+
+6. **Check progress**:
 
    ```bash
    curl http://localhost:8000/auth/vnc/status
@@ -234,7 +242,7 @@ or anywhere else you can reach over the network.
    restarted or re-initialized, since it didn't need to be.)
 
 If you close the browser tab or never finish logging in, the session tears itself
-down automatically after `expires_in_seconds` (10 minutes) - or stop it explicitly:
+down automatically after `expires_in_seconds` (15 minutes) - or stop it explicitly:
 
 ```bash
 curl -X POST http://localhost:8000/auth/vnc/stop

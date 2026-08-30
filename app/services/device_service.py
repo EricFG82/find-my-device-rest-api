@@ -368,6 +368,7 @@ class DeviceService:
             import hashlib
             from KeyBackup.cloud_key_decryptor import decrypt_aes_gcm
             from FMDNCrypto.foreign_tracker_cryptor import decrypt
+            from Auth.token_cache import get_cached_value
 
             result = None
             request_uuid = generate_random_uuid()
@@ -421,6 +422,25 @@ class DeviceService:
 
             # Extract and decrypt location data
             device_registration = result.deviceMetadata.information.deviceRegistration
+
+            # retrieve_identity_key() needs the "shared key" (see
+            # KeyBackup/shared_key_retrieval.py) regardless of whether this
+            # particular report turns out to be an own-report or a
+            # network/other-phone report. That key is only ever obtained
+            # through a real, visible Chrome window during the VNC login
+            # flow (vnc_auth_entrypoint.py) - this process has no display to
+            # show one. Check the cache directly rather than calling through
+            # and letting it attempt (and fail, or worse, hang) a live login
+            # attempt with nowhere to render it.
+            if get_cached_value('shared_key') is None:
+                logger.warning(
+                    f"No location for device {device_id}: the shared key needed to decrypt "
+                    "location reports hasn't been set up yet. Log in again via "
+                    "POST /auth/vnc/start (see AUTHENTICATION.md) and complete both sign-in "
+                    "steps shown in the browser."
+                )
+                return None
+
             identity_key = retrieve_identity_key(device_registration)
             locations_proto = result.deviceMetadata.information.locationInformation.reports.recentLocationAndNetworkLocations
             is_mcu = is_mcu_tracker(device_registration)

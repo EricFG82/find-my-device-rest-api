@@ -41,9 +41,13 @@ RUN git clone https://github.com/leonboe1/GoogleFindMyTools.git /app/GoogleFindM
 COPY patch_chrome_driver.py /app/
 COPY patch_fcm_receiver.py /app/
 COPY patch_auth_flow.py /app/
+COPY patch_token_cache.py /app/
+COPY patch_shared_key_flow.py /app/
 RUN python3 /app/patch_chrome_driver.py && \
     python3 /app/patch_fcm_receiver.py && \
-    python3 /app/patch_auth_flow.py
+    python3 /app/patch_auth_flow.py && \
+    python3 /app/patch_token_cache.py && \
+    python3 /app/patch_shared_key_flow.py
 
 # Runtime script that triggers the OAuth flow for the in-browser VNC auth method
 COPY vnc_auth_entrypoint.py /app/

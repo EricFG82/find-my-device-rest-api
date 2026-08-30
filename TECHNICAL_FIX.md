@@ -231,3 +231,35 @@ self._register_for_fcm_and_listen()` in both `register_for_location_updates()` a
 background update cycle across 6 real devices now does exactly one MCS login, zero
 task/race warnings, and all 6 locations update successfully.
 
+## Known issue (v1.2.4): `token_retrieval.py` never awaits `get_android_id()`
+
+`Auth/token_retrieval.py`'s `request_token()` - used by `get_adm_token()`, which
+`NovaApi/nova_request.py` calls on *every* Nova API request - does:
+
+```python
+android_id = FcmReceiver().get_android_id()
+```
+
+`get_android_id()` is `async def` (same patch as above), so this line doesn't
+call it at all - it just creates a coroutine object and never runs it, logging
+`RuntimeWarning: coroutine 'FcmReceiver.get_android_id' was never awaited` on
+every request. `android_id` ends up being that unexecuted coroutine object
+itself, not a real Android ID.
+
+In practice this hasn't caused visible failures: `gpsoauth.perform_oauth()`
+(the OAuth exchange this feeds into) doesn't appear to validate the
+`android_id` field against anything real for this scope, so the token
+exchange still succeeds and device list / location requests work regardless.
+It's still a real bug - malformed data sent to Google's API, log spam on
+every request, and an unawaited-coroutine object left for GC every time.
+
+**Why this isn't patched yet**: `request_token()` and everything above it in
+this call chain (`get_adm_token()`, `nova_request()`) are plain synchronous
+functions, called from both an executor thread (fine to bridge with
+`asyncio.run()`) *and* directly from the main event loop thread in
+`device_service.py` (where `asyncio.run()` would raise, since a loop is
+already running there). A correct fix needs the whole chain converted to
+`async def` with `await` threaded through both call sites, not just a patch
+to this one line - deferred rather than risk a rushed sync/async bridge that
+introduces a worse bug, since the current behavior doesn't block anything.
+

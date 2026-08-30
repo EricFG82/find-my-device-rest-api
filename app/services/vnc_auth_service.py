@@ -28,9 +28,13 @@ logger = logging.getLogger(__name__)
 DISPLAY = ":99"
 VNC_PORT = 5900
 NOVNC_PORT = 6080
-# Outer safety net - the underlying library's own OAuth cookie wait already
-# times out at 300s (see Auth/auth_flow.py), this just guarantees cleanup.
-SESSION_TIMEOUT_SECONDS = 600
+# Outer safety net. The session can now involve two sequential sign-ins
+# (see vnc_auth_entrypoint.py) - the main login and, if not already cached,
+# the shared-key login needed to decrypt other-phone location reports -
+# each with its own 300s cookie-wait timeout in the underlying library
+# (Auth/auth_flow.py, KeyBackup/shared_key_flow.py). This just guarantees
+# cleanup with some margin past both.
+SESSION_TIMEOUT_SECONDS = 900
 
 
 class VncAuthService:

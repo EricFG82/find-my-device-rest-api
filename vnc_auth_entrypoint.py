@@ -31,8 +31,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GoogleFindMyTools'))
 
 from Auth.aas_token_retrieval import _generate_aas_token  # noqa: E402
-from Auth.token_cache import set_cached_value  # noqa: E402
+from Auth.token_cache import set_cached_value, get_cached_value  # noqa: E402
 from NovaApi.ListDevices.nbe_list_devices import request_device_list  # noqa: E402
+from KeyBackup.shared_key_retrieval import get_shared_key  # noqa: E402
 
 
 def main() -> int:
@@ -58,6 +59,32 @@ def main() -> int:
         return 1
 
     print("[VncAuth] Authentication succeeded.")
+
+    # Decrypting a location report that came from someone else's phone (i.e.
+    # any device currently out of range of your own phone - the common case)
+    # needs a separate "shared key", fetched via its own Google sign-in +
+    # in-page key-exchange dance (get_shared_key() only does this once; it's
+    # a no-op if already cached from a previous session). This step running
+    # here, in the same VNC session, is what lets it use the real, visible
+    # Chrome window - triggering it later from the main API process would
+    # have nowhere to show the login (see the guard in device_service.py).
+    # Treated as non-fatal: the basic device list already verified above, so
+    # a failure/skip here shouldn't fail the whole login - it just means
+    # locations from other people's phones won't decrypt until this succeeds.
+    if get_cached_value('shared_key') is not None:
+        print("[VncAuth] Shared key (for decrypting other-phone location reports) already set up.")
+    else:
+        print("[VncAuth] Setting up the shared key needed to decrypt location reports that "
+              "come from other people's phones (e.g. any device currently out of range of "
+              "your own) - this needs signing in to Google a second time, in the same window.")
+        try:
+            get_shared_key()
+            print("[VncAuth] Shared key set up successfully.")
+        except Exception as e:
+            print(f"[VncAuth] Could not set up the shared key: {e}")
+            print("[VncAuth] Continuing anyway - devices in range of your own phone will still "
+                  "work; retry this login later to enable the rest.")
+
     return 0
 
 
