@@ -221,10 +221,10 @@ async def get_devices():
         503: {"model": ErrorResponse, "description": "Service unavailable"}
     }
 )
-async def get_device_detail(device_id: str):
+async def get_device_detail(device_id: str, force: bool = False):
     """
     Get detailed information for a specific device
-    
+
     Returns detailed information about a specific device including:
     - Device ID and name
     - Device type and model
@@ -233,9 +233,13 @@ async def get_device_detail(device_id: str):
     - Location accuracy
     - Last seen timestamp
     - Device status
-    
+
     Args:
         device_id: The unique identifier of the device
+        force: Actively request a fresh location from Google instead of the
+            background task's cache. Adds up to ~30s to the response - use
+            this for an explicit "locate now" action, not routine polling
+            (e.g. Home Assistant's regular updates should leave this off).
     """
     if device_service is None:
         raise HTTPException(
@@ -249,7 +253,7 @@ async def get_device_detail(device_id: str):
         )
 
     try:
-        device_detail = await device_service.get_device_detail(device_id)
+        device_detail = await device_service.get_device_detail(device_id, force_refresh=force)
         
         if device_detail is None:
             raise HTTPException(

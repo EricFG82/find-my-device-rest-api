@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.3] - 2026-08-30
+
+### Added
+
+- `GET /api/v1/devices/{device_id}` now accepts `?force=true` to actively
+  request a fresh location from Google instead of the background task's
+  cache (takes up to ~30s). Not meant for routine polling - only for an
+  explicit, user-triggered "locate now" action.
+
+### Fixed
+
+- The background location update cycle processed devices one at a time, so
+  with several devices, some could go stale for much longer than
+  `LOCATION_UPDATE_INTERVAL` (up to ~32s of the cycle per device ahead of
+  them, on top of any that hit the 30s FCM timeout). Devices are now
+  fetched concurrently, so a cycle takes as long as the single slowest
+  device instead of the sum of all of them.
+- Guarded the FCM connect/register step with a lock so concurrent fetches
+  can't re-trigger the race this project's TECHNICAL_FIX.md already
+  documents (multiple simultaneous callers all seeing `_listening=False`
+  and opening duplicate MCS connections) - only that fast step is
+  serialized, not the actual per-device wait for a location response.
+- The location cache's freshness check was hardcoded to 300 seconds
+  regardless of `LOCATION_UPDATE_INTERVAL` - now follows the configured
+  value.
+
 ## [1.2.2] - 2026-08-29
 
 ### Changed

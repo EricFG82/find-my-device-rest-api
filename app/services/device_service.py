@@ -47,6 +47,14 @@ class DeviceService:
         self._location_update_interval = int(os.getenv('LOCATION_UPDATE_INTERVAL', '300'))
 
         self._fcm_receiver = None  # Shared FCM receiver instance
+        # Guards FcmReceiver creation + register_for_location_updates() only -
+        # concurrent location fetches (see _background_location_updater) would
+        # otherwise all see _listening=False and race to open their own MCS
+        # connection (the exact bug fixed in TECHNICAL_FIX.md's follow-up
+        # section). Registration itself is fast; the actual per-device wait
+        # for a location response happens after releasing this lock, so this
+        # doesn't serialize the slow part.
+        self._fcm_registration_lock = asyncio.Lock()
 
         # Enable/disable background location updates (default: true)
         self._enable_location_updates = os.getenv('ENABLE_LOCATION_UPDATES', 'true').lower() == 'true'
@@ -287,23 +295,27 @@ class DeviceService:
                     await asyncio.sleep(self._location_update_interval)
                     continue
 
-                # Update locations for all devices
-                for device_data in devices_data:
+                # Update locations for all devices concurrently - these are
+                # independent FCM round-trips (each with its own request_uuid),
+                # so there's no need to wait for one device's up-to-30s timeout
+                # before even starting the next. Sequentially, N devices could
+                # take N * ~32s; concurrently, the whole cycle takes as long as
+                # the single slowest device.
+                async def _update_one(device_data: Dict[str, Any]) -> None:
                     device_id = device_data.get('id', device_data.get('deviceId'))
                     device_name = device_data.get('name', device_data.get('deviceName', 'Unknown'))
+                    if not device_id:
+                        return
+                    try:
+                        location_data = await self._fetch_location_for_device_internal(device_id, device_name)
+                        if location_data:
+                            logger.info(f"Updated location for device {device_name} ({device_id})")
+                        else:
+                            logger.debug(f"No location data available for device {device_name} ({device_id})")
+                    except Exception as e:
+                        logger.error(f"Error updating location for device {device_id}: {e}")
 
-                    if device_id:
-                        try:
-                            location_data = await self._fetch_location_for_device_internal(device_id, device_name)
-                            if location_data:
-                                logger.info(f"Updated location for device {device_name} ({device_id})")
-                            else:
-                                logger.debug(f"No location data available for device {device_name} ({device_id})")
-                        except Exception as e:
-                            logger.error(f"Error updating location for device {device_id}: {e}")
-
-                    # Small delay between devices to avoid overwhelming the API
-                    await asyncio.sleep(2)
+                await asyncio.gather(*(_update_one(d) for d in devices_data))
 
                 logger.info(f"Background location update cycle complete. Next update in {self._location_update_interval} seconds")
 
@@ -316,21 +328,29 @@ class DeviceService:
             # Wait before next update cycle
             await asyncio.sleep(self._location_update_interval)
 
-    async def _fetch_location_for_device_internal(self, device_id: str, device_name: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_location_for_device_internal(self, device_id: str, device_name: str, force: bool = False) -> Optional[Dict[str, Any]]:
         """Internal method to fetch location data for a specific device
 
         This runs in the background task and has access to the main event loop.
+
+        Args:
+            force: Skip the cache-freshness check below and always hit Google
+                for a new location, even if a recent one is already cached.
         """
         if self._vnc_auth_service and self._vnc_auth_service.state == "running":
             logger.debug(f"Skipping location fetch for {device_id}: VNC auth session in progress")
             return None
 
         try:
-            # Check location cache first (5 minute TTL for locations)
+            # Check location cache first (same TTL as the background update
+            # interval - no point re-requesting more often than we naturally
+            # refresh anyway) - unless the caller explicitly wants a forced,
+            # guaranteed-fresh fetch.
             now = datetime.now()
-            if (device_id in self._location_cache and
+            if (not force and
+                device_id in self._location_cache and
                 device_id in self._location_cache_timestamp and
-                (now - self._location_cache_timestamp[device_id]).total_seconds() < 300):
+                (now - self._location_cache_timestamp[device_id]).total_seconds() < self._location_update_interval):
                 logger.debug(f"Returning cached location for device {device_id}")
                 return self._location_cache[device_id]
 
@@ -349,10 +369,6 @@ class DeviceService:
             from KeyBackup.cloud_key_decryptor import decrypt_aes_gcm
             from FMDNCrypto.foreign_tracker_cryptor import decrypt
 
-            # Initialize FCM receiver if not already done
-            if self._fcm_receiver is None:
-                self._fcm_receiver = FcmReceiver()
-
             result = None
             request_uuid = generate_random_uuid()
 
@@ -362,13 +378,21 @@ class DeviceService:
                 if device_update.fcmMetadata.requestUuid == request_uuid:
                     result = device_update
 
-            # Register for FCM updates (now properly async)
-            try:
-                fcm_token = await self._fcm_receiver.register_for_location_updates(handle_location_response)
-            except Exception as e:
-                logger.error(f"FCM registration failed: {e}")
-                logger.info("Location fetching is not available")
-                return None
+            # Initialize the FCM receiver and register for updates under a
+            # lock - concurrent callers (parallel background-cycle fetches,
+            # or a force-refresh landing mid-cycle) must not race each other
+            # into opening duplicate MCS connections (see the lock's comment
+            # in __init__). Only the connect+register is serialized; the
+            # response wait below runs fully concurrently per caller.
+            async with self._fcm_registration_lock:
+                if self._fcm_receiver is None:
+                    self._fcm_receiver = FcmReceiver()
+                try:
+                    fcm_token = await self._fcm_receiver.register_for_location_updates(handle_location_response)
+                except Exception as e:
+                    logger.error(f"FCM registration failed: {e}")
+                    logger.info("Location fetching is not available")
+                    return None
 
             # Create and send location request
             hex_payload = create_location_request(device_id, fcm_token, request_uuid)
@@ -472,12 +496,19 @@ class DeviceService:
             logger.error(f"Error fetching location for device {device_id}: {e}", exc_info=True)
             return None
 
-    async def _fetch_location_for_device(self, device_id: str, device_name: str) -> Optional[Dict[str, Any]]:
-        """Get cached location data for a specific device
+    async def _fetch_location_for_device(self, device_id: str, device_name: str, force: bool = False) -> Optional[Dict[str, Any]]:
+        """Get location data for a specific device
 
-        Note: Locations are updated automatically by the background task every 5 minutes.
-        This method returns cached data and does not trigger a fresh location request.
+        Note: Locations are updated automatically by the background task every
+        LOCATION_UPDATE_INTERVAL seconds. By default this method just returns
+        whatever is cached from that and does not trigger a fresh location
+        request - pass force=True to actively request one from Google instead
+        (takes up to ~30s; only use this for an explicit, on-demand refresh,
+        not for routine polling).
         """
+        if force:
+            return await self._fetch_location_for_device_internal(device_id, device_name, force=True)
+
         try:
             # Return cached location if available
             if device_id in self._location_cache:
@@ -651,12 +682,16 @@ class DeviceService:
             logger.error(f"Error getting all devices: {e}", exc_info=True)
             raise
     
-    async def get_device_detail(self, device_id: str, fetch_location: bool = True) -> Optional[DeviceDetail]:
+    async def get_device_detail(self, device_id: str, fetch_location: bool = True, force_refresh: bool = False) -> Optional[DeviceDetail]:
         """Get detailed information for a specific device
 
         Args:
             device_id: The device ID to fetch details for
-            fetch_location: Whether to fetch fresh location data (default: True)
+            fetch_location: Whether to include location data at all (default: True)
+            force_refresh: Actively request a fresh location from Google
+                instead of using the background task's cache (default: False -
+                adds up to ~30s to the request, so leave this off for routine
+                polling and only set it for an explicit user-triggered refresh)
         """
         if not self.initialized:
             raise RuntimeError(f"Device service not initialized: {self.init_error or 'unknown initialization error'}")
@@ -679,7 +714,7 @@ class DeviceService:
             # Fetch location data if requested
             if fetch_location:
                 device_name = device_data.get('name', device_data.get('deviceName', 'Unknown'))
-                location_data = await self._fetch_location_for_device(device_id, device_name)
+                location_data = await self._fetch_location_for_device(device_id, device_name, force=force_refresh)
 
                 if location_data:
                     # Add location data to device_data

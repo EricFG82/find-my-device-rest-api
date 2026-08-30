@@ -42,7 +42,7 @@ A REST API service that exposes Google Find My Device functionality using the [G
 | `/`                            | GET    | API information and available endpoints |
 | `/health`                      | GET    | Health check                   |
 | `/api/v1/devices`              | GET    | List all devices               |
-| `/api/v1/devices/{device_id}`  | GET    | Get device details             |
+| `/api/v1/devices/{device_id}`  | GET    | Get device details - add `?force=true` to actively request a fresh location from Google instead of the cached one (takes up to ~30s; don't use for routine polling) |
 | `/auth/vnc/start`              | POST   | Start an in-browser (VNC) login session - see [AUTHENTICATION.md](AUTHENTICATION.md#method-3-authenticate-via-browser-vnc---no-local-chrome-needed) |
 | `/auth/vnc/status`             | GET    | Check the VNC login session's progress |
 | `/auth/vnc/stop`               | POST   | Tear down the VNC login session |
@@ -448,6 +448,21 @@ environment:
 environment:
   - DEVICE_CACHE_TTL=120
   - LOCATION_UPDATE_INTERVAL=600 # Update every 10 minutes
+```
+
+**Getting a location right now, on demand**: routine polling (Home Assistant's
+regular updates, or a plain `GET /api/v1/devices/{device_id}`) always reads
+the background task's cache - it never blocks a request waiting on Google.
+Every device in a cycle is now requested concurrently, so the cache is
+typically no more than `LOCATION_UPDATE_INTERVAL` old rather than
+`LOCATION_UPDATE_INTERVAL * number_of_devices` in the worst case. If you need
+a location fresher than that right now (e.g. a "locate" button in a
+dashboard, not routine polling), add `?force=true` to the device detail
+request - this actively asks Google for a new location instead of using the
+cache, at the cost of the request taking up to ~30s to respond:
+
+```bash
+curl "http://localhost:8000/api/v1/devices/{device_id}?force=true"
 ```
 
 ### Docker Compose Configuration
